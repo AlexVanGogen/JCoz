@@ -33,7 +33,7 @@
 static Profiler *prof;
 FILE *Globals::OutFile;
 static bool updateEventsEnabledState(jvmtiEnv *jvmti, jvmtiEventMode enabledState);
-static volatile int class_prep_lock = 0;
+static volatile pthread_t class_prep_lock = 0;
 static bool acquireCreateLock(); static void releaseCreateLock();
 
 void JNICALL OnThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni_env,
