@@ -100,6 +100,13 @@ public class LocalProcessWrapper implements TargetProcessInterface{
         }
     }
 
+    public void setScopesToIgnoreFilePath(String scopesToIgnoreFilePath) throws JCozException {
+        int returnCode = mbeanProxy.setScopesToIgnoreFilePath(scopesToIgnoreFilePath);
+        if (returnCode != 0) {
+            throw JCozExceptionFactory.getInstance().getJCozExceptionFromErrorCode(returnCode);
+        }
+    }
+
     public List<Experiment> getProfilerOutput() throws JCozException{
         List<Experiment> experiments = new ArrayList<>();
         ObjectInputStream ois;

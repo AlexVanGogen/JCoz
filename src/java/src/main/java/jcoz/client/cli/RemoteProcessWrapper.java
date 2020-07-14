@@ -147,4 +147,17 @@ public class RemoteProcessWrapper implements TargetProcessInterface {
         }
     }
 
+    @Override
+    public void setScopesToIgnoreFilePath(String scopesToIgnoreFilePath) throws JCozException {
+        int returnCode;
+        try {
+            returnCode = service.setScopesToIgnoreFilePath(remotePid, scopesToIgnoreFilePath);
+        } catch (RemoteException e) {
+            throw new JCozException(e);
+        }
+        if(returnCode != 0){
+            throw JCozExceptionFactory.getInstance().getJCozExceptionFromErrorCode(returnCode);
+        }
+    }
+
 }

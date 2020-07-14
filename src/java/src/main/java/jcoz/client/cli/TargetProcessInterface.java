@@ -44,4 +44,6 @@ public interface TargetProcessInterface {
     public String getCurrentScope() throws JCozException;
 
     public String getProgressPoint() throws JCozException;
+
+    void setScopesToIgnoreFilePath(String scopesToIgnoreFilePath) throws JCozException;
 }

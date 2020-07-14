@@ -194,4 +194,17 @@ public class JCozServiceImpl implements JCozServiceInterface {
         return attachedVMs.get(pid).getProgressPoint();
     }
 
+    @Override
+    public String getScopesToIgnoreFilePath(int pid) throws RemoteException {
+        if (!attachedVMs.containsKey(pid)) {
+            throw new RemoteException("", new JCozException(String.format(JVM_WITH_PID_IS_NOT_ATTACHED, pid)));
+        }
+        return attachedVMs.get(pid).getScopesToIgnoreFilePath();
+    }
+
+    @Override
+    public int setScopesToIgnoreFilePath(int pid, String path) throws RemoteException {
+        return attachedVMs.get(pid).setScopesToIgnoreFilePath(path);
+    }
+
 }

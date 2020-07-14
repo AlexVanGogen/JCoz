@@ -53,6 +53,9 @@ public class JCozProfiler implements JCozProfilerMBean {
      * scope to jcoz.profile
      */
     private String currentScope = null;
+
+    private String currentScopesToIgnoreFilePath = null;
+
     /**
      * is an experiment running
      */
@@ -193,6 +196,25 @@ public class JCozProfiler implements JCozProfilerMBean {
     }
 
     private native int setScopeNative(String scopePackage);
+
+    @Override
+    public String getScopesToIgnoreFilePath() {
+        return currentScopesToIgnoreFilePath;
+    }
+
+    @Override
+    public int setScopesToIgnoreFilePath(String scopesToIgnoreFilePath) {
+        if (experimentRunning) {
+            return JCozProfilingErrorCodes.CANNOT_CALL_WHEN_RUNNING;
+        }
+        int scopeReturn = setScopesToIgnoreFilePathNative(scopesToIgnoreFilePath);
+        if (scopeReturn == 0) {
+            currentScopesToIgnoreFilePath = scopesToIgnoreFilePath;
+        }
+        return scopeReturn;
+    }
+
+    private native int setScopesToIgnoreFilePathNative(String scopesToIgnoreFilePath);
 
     /**
      * get the current progress point as a string class and line number are separated by a ':'

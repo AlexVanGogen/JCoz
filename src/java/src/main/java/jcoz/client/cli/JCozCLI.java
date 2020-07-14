@@ -73,6 +73,10 @@ public class JCozCLI {
         outputFormatOption.setRequired(false);
         ops.addOption(outputFormatOption);
 
+        Option scopesToIgnoreOption = new Option("i", "scopesToIgnorePath", true, "Path to file with scopes that must be ignored");
+        scopesToIgnoreOption.setRequired(false);
+        ops.addOption(scopesToIgnoreOption);
+
         CommandLineParser parser = new DefaultParser();
         CommandLine cl = parser.parse(ops, args);
         String ppClass = cl.getOptionValue('c');
@@ -92,7 +96,7 @@ public class JCozCLI {
             System.exit(-1);
         }
 
-        String format = cl.getOptionValue('o');
+        String format = cl.getOptionValue('f');
         if (format == null || format.isEmpty()) {
             format = "coz";
         }
@@ -106,6 +110,11 @@ public class JCozCLI {
             }
         }
 
+        String scopesToIgnoreFilePath = cl.getOptionValue('i');
+        if (scopesToIgnoreFilePath != null) {
+            logger.info("Use specified path to file with scopes to ignore: {}", scopesToIgnoreFilePath);
+        }
+
         String remoteHost = cl.getOptionValue('h');
         boolean isRemote = remoteHost != null && !remoteHost.equals("");
         if (isRemote) {
@@ -116,6 +125,9 @@ public class JCozCLI {
                 TargetProcessInterface profiledClient = remoteService.attachToProcess(pid);
                 profiledClient.setProgressPoint(ppClass, ppLineNo);
                 profiledClient.setScope(scopePkg);
+                if (scopesToIgnoreFilePath != null) {
+                    profiledClient.setScopesToIgnoreFilePath(scopesToIgnoreFilePath);
+                }
                 profiledClient.startProfiling();
 
                 while (true) {
@@ -157,6 +169,9 @@ public class JCozCLI {
             }));
             wrapper.setProgressPoint(ppClass, ppLineNo);
             wrapper.setScope(scopePkg);
+            if (scopesToIgnoreFilePath != null) {
+                wrapper.setScopesToIgnoreFilePath(scopesToIgnoreFilePath);
+            }
             wrapper.startProfiling();
             try {
                 while (true) {

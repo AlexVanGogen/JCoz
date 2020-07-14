@@ -104,6 +104,8 @@ nanoseconds_type startup_time;
 // Logger
 std::shared_ptr<spdlog::logger> Profiler::logger = spdlog::basic_logger_mt("basic_logger", "log.txt");
 
+std::vector<std::string> Profiler::scopes_to_ignore;
+
 /**
  * Wrapper function for sleeping
  */
@@ -580,6 +582,28 @@ void Profiler::clearMBeanObject(){
 
 void Profiler::setJNI(JNIEnv* jni){
   jni_ = jni;
+}
+
+void Profiler::collectScopesToIgnore(std::string const& scopes_to_ignore_file_path) {
+    logger->info("Start collecting scopes to ignore");
+    std::string next_scope;
+    std::ifstream file(scopes_to_ignore_file_path);
+    if (file.is_open()) {
+        while (getline(file, next_scope)) {
+            canonicalizeScope(next_scope);
+            addScopeToIgnore(next_scope);
+        }
+    }
+    logger->info("End collecting scopes to ignore");
+}
+
+void Profiler::canonicalizeScope(std::string& scope) {
+    std::replace(scope.begin(), scope.end(), '.', '/');
+}
+
+void Profiler::addScopeToIgnore(std::string& scope) {
+    logger->info("Start ignoring scope {}", scope);
+    scopes_to_ignore.emplace_back(scope);
 }
 
 void Profiler::Handle(int signum, siginfo_t *info, void *context) {

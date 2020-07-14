@@ -37,4 +37,8 @@ public interface JCozProfilerMBean {
     public String getCurrentScope();
 
     public String getProgressPoint();
+
+    String getScopesToIgnoreFilePath();
+
+    public int setScopesToIgnoreFilePath(String scopesToIgnoreFilePath);
 }

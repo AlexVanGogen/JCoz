@@ -93,6 +93,10 @@ class Profiler {
 
     static std::shared_ptr<spdlog::logger> &getLogger() { return logger; };
 
+    static void collectScopesToIgnore(std::string const&);
+
+    static std::vector<std::string>& getScopesToIgnore() { return scopes_to_ignore; }
+
     static std::unordered_set<void *> &getInScopeMethods() { return in_scope_ids; }
 
     static struct Experiment &getCurrentExperiment() { return current_experiment; }
@@ -161,6 +165,9 @@ class Profiler {
     static bool inline frameInScope(JVMPI_CallFrame &curr_frame);
     DISALLOW_COPY_AND_ASSIGN(Profiler);
 
+    static void canonicalizeScope(std::string&);
+    static void addScopeToIgnore(std::string&);
+
     static jobject mbean;
 
     static jmethodID mbean_cache_method_id;
@@ -224,6 +231,8 @@ class Profiler {
     static bool fix_exp;
 
     static std::shared_ptr<spdlog::logger> logger;
+
+    static std::vector<std::string> scopes_to_ignore;
 };
 
 #endif  // PROFILER_H

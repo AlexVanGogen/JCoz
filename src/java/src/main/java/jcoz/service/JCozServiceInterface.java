@@ -50,5 +50,7 @@ public interface JCozServiceInterface extends Remote{
 
     public String getProgressPoint(int pid) throws RemoteException;
 
+    public String getScopesToIgnoreFilePath(int pid) throws RemoteException;
 
+    public int setScopesToIgnoreFilePath(int pid, String path) throws RemoteException;
 }

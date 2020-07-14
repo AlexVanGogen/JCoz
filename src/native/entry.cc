@@ -121,6 +121,18 @@ static void releaseCreateLock() {
   std::atomic_thread_fence(std::memory_order_release);
 }
 
+bool isPrefix(const char* prefix, char* str) {
+    return strstr(str, prefix) == str + sizeof(char);
+}
+
+bool isInAllowedScope(char* class_sig, const char* defined_scope) {
+    for (std::string& scope_to_ignore : prof->getScopesToIgnore()) {
+        if (isPrefix(scope_to_ignore.c_str(), class_sig)) {
+            return false;
+        }
+    }
+    return isPrefix(defined_scope, class_sig);
+}
 
 // Calls GetClassMethods on a given class to force the creation of
 // jmethodIDs of it.
@@ -143,13 +155,11 @@ void CreateJMethodIDsForClass(jvmtiEnv *jvmti, jclass klass) {
     JvmtiScopedPtr<char> ksig(jvmti);
     jvmti->GetClassSignature(klass, ksig.GetRef(), NULL);
 
-    std::string package_str = "L" + prof->getPackage();
     logger->info(
         "Creating JMethod IDs. [Class: {class}] [Scope: {scope}]",
-        fmt::arg("class", ksig.Get()), fmt::arg("scope", package_str));
-    if( strstr(ksig.Get(), package_str.c_str()) == ksig.Get() ) {
+        fmt::arg("class", ksig.Get()), fmt::arg("scope", prof->getPackage()));
+    if( isInAllowedScope(ksig.Get(), prof->getPackage().c_str()) ) {
       prof->addInScopeMethods(method_count, methods.Get());
-
     }
 
     //TODO: this matches a prefix. class name AA will match a progress
@@ -224,7 +234,14 @@ jint JNICALL setScopeNative(JNIEnv *env, jobject thisObj, jstring scope) {
   return 0;
 }
 
+jint JNICALL setScopesToIgnoreFilePathNative(JNIEnv *env, jobject thisObj, jstring path) {
+    const char *path_native = env->GetStringUTFChars(path, 0);
+    auto logger = prof->getLogger();
 
+    prof->collectScopesToIgnore(path_native);
+    env->ReleaseStringUTFChars(path, path_native);
+    return 0;
+}
 
 void JNICALL OnVMInit(jvmtiEnv *jvmti, JNIEnv *jni_env, jthread thread) {
   IMPLICITLY_USE(thread);
@@ -251,10 +268,11 @@ void JNICALL OnVMInit(jvmtiEnv *jvmti, JNIEnv *jni_env, jthread thread) {
   logger->info("Successfully found JCoz Profiler class and static methodc to register mbean.");
 
   JNINativeMethod methods[] = {
-    {(char *)"startProfilingNative",   (char *)"()I",                     (void *)&startProfilingNative},
-    {(char *)"endProfilingNative",     (char *)"()I",                     (void *)&endProfilingNative},
-    {(char *)"setProgressPointNative", (char *)"(Ljava/lang/String;I)I",  (void *)&setProgressPointNative},
-    {(char *)"setScopeNative",         (char *)"(Ljava/lang/String;)I",   (void *)&setScopeNative},
+    {(char *)"startProfilingNative",                    (char *)"()I",                     (void *)&startProfilingNative},
+    {(char *)"endProfilingNative",                      (char *)"()I",                     (void *)&endProfilingNative},
+    {(char *)"setProgressPointNative",                  (char *)"(Ljava/lang/String;I)I",  (void *)&setProgressPointNative},
+    {(char *)"setScopeNative",                          (char *)"(Ljava/lang/String;)I",   (void *)&setScopeNative},
+    {(char *)"setScopesToIgnoreFilePathNative",         (char *)"(Ljava/lang/String;)I",   (void *)&setScopesToIgnoreFilePathNative},
   };
 
   jint err;
