@@ -24,12 +24,16 @@ import com.sun.tools.attach.VirtualMachine;
 import com.sun.tools.attach.VirtualMachineDescriptor;
 import jcoz.profile.Experiment;
 import jcoz.profile.Profile;
+import jcoz.profile.format.ExperimentOutputFormat;
+import jcoz.profile.format.ExperimentOutputFormatFactory;
 import jcoz.service.JCozException;
 import jcoz.service.VirtualMachineConnectionException;
 import org.apache.commons.cli.*;
 
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.file.*;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -65,6 +69,10 @@ public class JCozCLI {
         remoteHostOption.setRequired(false);
         ops.addOption(remoteHostOption);
 
+        Option outputFormatOption = new Option("f", "format", true, "Output format for experiment (coz by default)");
+        outputFormatOption.setRequired(false);
+        ops.addOption(outputFormatOption);
+
         CommandLineParser parser = new DefaultParser();
         CommandLine cl = parser.parse(ops, args);
         String ppClass = cl.getOptionValue('c');
@@ -82,6 +90,20 @@ public class JCozCLI {
         } catch (NumberFormatException e) {
             logger.error("Invalid pid: {}", cl.getOptionValue('l'));
             System.exit(-1);
+        }
+
+        String format = cl.getOptionValue('o');
+        if (format == null || format.isEmpty()) {
+            format = "coz";
+        }
+        ExperimentOutputFormat outputFormat = ExperimentOutputFormatFactory.getInstance().fromString(format);
+        Path outputFile = Paths.get("profile_" + pid + "." + format);
+        if (!Files.exists(outputFile)) {
+            try {
+                Files.createFile(outputFile);
+            } catch (IOException e) {
+                logger.error("Unable to create file {}: {}", outputFile.getFileName(), e.getMessage());
+            }
         }
 
         String remoteHost = cl.getOptionValue('h');
@@ -136,11 +158,17 @@ public class JCozCLI {
             wrapper.setProgressPoint(ppClass, ppLineNo);
             wrapper.setScope(scopePkg);
             wrapper.startProfiling();
-            while (true) {
-                for (Experiment e : wrapper.getProfilerOutput()) {
-                    logger.info("Experiment: {}", e);
+            try {
+                while (true) {
+                    for (Experiment e : wrapper.getProfilerOutput()) {
+                        logger.info("Experiment: {}", e);
+                        Files.write(outputFile, outputFormat.format(e), StandardOpenOption.APPEND);
+                    }
+                    Thread.sleep(1000);
                 }
-                Thread.sleep(1000);
+            } catch (IOException e) {
+                logger.error("Error occurred while writing output: " + e.toString());
+                e.printStackTrace();
             }
         }
     }
