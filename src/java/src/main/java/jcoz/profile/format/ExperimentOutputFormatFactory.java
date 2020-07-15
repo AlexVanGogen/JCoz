@@ -19,11 +19,14 @@ public class ExperimentOutputFormatFactory {
     }
 
     public ExperimentOutputFormat fromString(String format) {
-        if ("coz".equals(format)) {
-            return new CozExperimentOutputFormat();
-        } else {
-            logger.warn("Unknown output format: {}. Will use 'coz' as default...", format);
-            return new CozExperimentOutputFormat();
+        switch (format) {
+            case "coz":
+                return new CozExperimentOutputFormat();
+            case "csv":
+                return new CsvExperimentOutputFormat();
+            default:
+                logger.warn("Unknown output format: {}. Will use 'coz' as default...", format);
+                return new CozExperimentOutputFormat();
         }
     }
 }
