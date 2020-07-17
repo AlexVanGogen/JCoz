@@ -68,7 +68,7 @@ class SignalHandler {
   public:
     SignalHandler() {}
 
-    struct sigaction SetAction(void (*sigaction)(int, siginfo_t *, void *));
+    static struct sigaction SetAction(void (*sigaction)(int, siginfo_t *, void *));
 
   private:
     DISALLOW_COPY_AND_ASSIGN(SignalHandler);
@@ -85,7 +85,9 @@ class Profiler {
 
     void Start();
 
-    void Stop();
+    static void Stop();
+
+    void ParseOptions(const char *options);
 
     static std::string &getPackage() { return package; }
 
@@ -165,7 +167,7 @@ class Profiler {
     static bool inline frameInScope(JVMPI_CallFrame &curr_frame);
     DISALLOW_COPY_AND_ASSIGN(Profiler);
 
-    static void canonicalizeScope(std::string&);
+    static void canonicalize(std::string &scope);
     static void addScopeToIgnore(std::string&);
 
     static jobject mbean;
