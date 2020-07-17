@@ -159,11 +159,35 @@ void Profiler::ParseOptions(const char *options) {
             warmup_time = std::stol(value) * 1000;
         } else if (option == "fix-exp" ) {
             fix_exp = true;
+        } else if (option == "ignore") {
+            std::stringstream ignore_scopes_stream(value);
+            while( std::getline(ignore_scopes_stream, item, '|') ) {
+                canonicalize(item);
+                Profiler::addScopeToIgnore(item);
+            }
         }
     }
 
-    logger->info("Profiler arguments:\n\tprogress point: {}:{}\n\tscope: {}\n\twarmup: {}us\n\tend-to-end: {}\n\tfixed experiment duration: {}",
-            progress_class, progress_point->lineno, Profiler::package, warmup_time, end_to_end, fix_exp);
+
+    std::string joint_scopes;
+    const char* const delim = ", ";
+    for (auto next_scope = Profiler::scopes_to_ignore.begin(); next_scope != Profiler::scopes_to_ignore.end(); ++next_scope)
+    {
+        joint_scopes += *next_scope;
+        if (next_scope != Profiler::scopes_to_ignore.end() - 1)
+        {
+            joint_scopes += delim;
+        }
+    }
+
+    logger->info("Profiler arguments:\n"
+                 "\tprogress point: {}:{}\n"
+                 "\tscope: {}\n"
+                 "\tscopes to ignore: {}\n"
+                 "\twarmup: {}us\n"
+                 "\tend-to-end: {}\n"
+                 "\tfixed experiment duration: {}",
+            progress_class, progress_point->lineno, Profiler::package, joint_scopes, warmup_time, end_to_end, fix_exp);
     if( Profiler::package.empty() || (!end_to_end && (progress_class.empty() || progress_point->lineno == -1)) ) {
         fprintf(stderr, "Missing package, progress class, or progress point\n");
         print_usage();
