@@ -46,6 +46,7 @@ struct Experiment {
   long duration = 0;
   jmethodID method_id;
   jint lineno;
+  jint bci;
   std::pair<jint,jint> *location_ranges;
   int num_ranges;
 };

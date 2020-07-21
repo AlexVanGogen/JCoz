@@ -326,10 +326,10 @@ void Profiler::runExperiment(JNIEnv * jni_env) {
   }
 
   // Log the run experiment results
-  logger->info("experiment\tselected={class}:{line_no}\tspeedup={speedup}\tduration={duration}\nprogress-point\tname=end-to-end\ttype=source\tdelta={points_hit}",
+  logger->info("experiment\tselected={class}:{line_no}|{bci}\tspeedup={speedup}\tduration={duration}\nprogress-point\tname=end-to-end\ttype=source\tdelta={points_hit}",
           fmt::arg("speedup", current_experiment.speedup), fmt::arg("points_hit", current_experiment.points_hit),
           fmt::arg("duration", current_experiment.duration - current_experiment.delay), fmt::arg("class", sig),
-          fmt::arg("line_no", current_experiment.lineno));
+          fmt::arg("line_no", current_experiment.lineno), fmt::arg("bci", current_experiment.bci));
   logger->flush();
 
   delete[] current_experiment.location_ranges;
@@ -406,6 +406,7 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
 
       logger->debug("Found in scope frames. Choosing a frame and running experiment...");
       current_experiment.method_id = exp_frame.method_id;
+      current_experiment.bci = exp_frame.lineno;
       jint start_line;
       jint end_line; //exclusive
       jint line = -1;
