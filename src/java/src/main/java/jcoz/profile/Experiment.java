@@ -101,7 +101,7 @@ public class Experiment implements Comparable<Experiment> {
     /*
      * getters
      */
-    String getClassSig() {
+    public String getClassSig() {
         return classSig;
     }
 
@@ -109,15 +109,15 @@ public class Experiment implements Comparable<Experiment> {
         return lineNo;
     }
 
-    float getSpeedup() {
+    public float getSpeedup() {
         return speedup;
     }
 
-    long getDuration() {
+    public long getDuration() {
         return duration;
     }
 
-    long getPointsHit() {
+    public long getPointsHit() {
         return pointsHit;
     }
 
