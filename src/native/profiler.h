@@ -19,7 +19,7 @@
  * a copy of the license that was included with that original work.
  */
 
-#include <signal.h>
+#include <csignal>
 #include <jvmti.h>
 #include <unordered_set>
 #include <unordered_map>
@@ -95,17 +95,7 @@ class Profiler {
 
     static std::shared_ptr<spdlog::logger> &getLogger() { return logger; };
 
-    static void collectScopesToIgnore(std::string const&);
-
     static std::vector<std::string>& getScopesToIgnore() { return scopes_to_ignore; }
-
-    static std::unordered_set<void *> &getInScopeMethods() { return in_scope_ids; }
-
-    static struct Experiment &getCurrentExperiment() { return current_experiment; }
-
-    static bool inExperiment() { return in_experiment; }
-
-    static std::unordered_set<struct UserThread*> &getUserThreads() { return user_threads; }
 
     static void runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args);
 
@@ -123,8 +113,6 @@ class Profiler {
 
     static void clearProgressPoint();
 
-    static void printInScopeLineNumberMapping();
-
     static void HandleBreakpoint(
         jvmtiEnv *jvmti,
         JNIEnv *jni_env,
@@ -133,25 +121,13 @@ class Profiler {
         jlocation location
         );
 
-    void setScope(std::string package);
-
-    void setProgressPoint(std::string class_name, jint line_no);
-
-    void setMBeanObject(jobject mbean);
-
-    jobject getMBeanObject();
-
-    void clearMBeanObject();
-
-    void setJNI(JNIEnv* jni);
-
     static void clearInScopeMethods();
 
     static bool isRunning();
 
-    void init();
+private:
 
-  private:
+    DISALLOW_COPY_AND_ASSIGN(Profiler);
 
     jvmtiEnv *jvmti_;
 
@@ -159,20 +135,13 @@ class Profiler {
 
     struct sigaction old_action_;
 
-    static JNIEnv *jni_;
-
     static void Handle(int signum, siginfo_t *info, void *context);
 
     static bool inline inExperiment(JVMPI_CallFrame &curr_frame);
     static bool inline frameInScope(JVMPI_CallFrame &curr_frame);
-    DISALLOW_COPY_AND_ASSIGN(Profiler);
 
     static void canonicalize(std::string &scope);
     static void addScopeToIgnore(std::string&);
-
-    static jobject mbean;
-
-    static jmethodID mbean_cache_method_id;
 
     static std::unordered_set<void *> in_scope_ids;
 

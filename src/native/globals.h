@@ -19,11 +19,11 @@
  * a copy of the license that was included with that original work.
  */
 
-#include <assert.h>
+#include <cassert>
 #include <dlfcn.h>
 #include <jvmti.h>
 #include <jni.h>
-#include <stdint.h>
+#include <cstdint>
 #ifdef __APPLE__
 #include <pthread.h>
 #endif
@@ -94,20 +94,20 @@ class JvmtiScopedPtr {
   public:
     explicit JvmtiScopedPtr(jvmtiEnv *jvmti)
       : jvmti_(jvmti),
-      ref_(NULL) {}
+      ref_(nullptr) {}
 
     JvmtiScopedPtr(jvmtiEnv *jvmti, T *ref)
       : jvmti_(jvmti),
       ref_(ref) {}
 
     ~JvmtiScopedPtr() {
-      if (NULL != ref_) {
+      if (nullptr != ref_) {
         JVMTI_ERROR(jvmti_->Deallocate((unsigned char *)ref_));
       }
     }
 
     T **GetRef() {
-      assert(ref_ == NULL);
+      assert(ref_ == nullptr);
       return &ref_;
     }
 
@@ -116,7 +116,7 @@ class JvmtiScopedPtr {
     }
 
     void AbandonBecauseOfError() {
-      ref_ = NULL;
+      ref_ = nullptr;
     }
 
   private:
@@ -148,7 +148,7 @@ class Accessors {
     }
 
     static void Init() {
-      if (pthread_key_create(&key_, NULL) != 0) {
+      if (pthread_key_create(&key_, nullptr) != 0) {
         perror("Unable to init thread-local storage.  Profiling won't work:");
       }
     }
@@ -182,8 +182,8 @@ class Accessors {
 #else
         static void *handle = dlopen("libjvm.so", RTLD_LAZY);
 #endif
-        if (handle == NULL) {
-          return NULL;
+        if (handle == nullptr) {
+          return nullptr;
         }
 
         // get address of function, return null if not found

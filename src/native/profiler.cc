@@ -21,14 +21,13 @@
 
 #include "profiler.h"
 
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/time.h>
+#include <cerrno>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
 #include <vector>
 #include <set>
 #include <chrono>
-#include <time.h>
 #include <unordered_set>
 #include <unordered_map>
 #include <jvmti.h>
@@ -66,7 +65,7 @@ thread_local struct UserThread *curr_ut;
 // Initialize static Profiler variables here
 std::unordered_set<void *> Profiler::in_scope_ids;
 volatile bool Profiler::in_experiment = false;
-volatile pthread_t Profiler::in_scope_lock = 0;
+volatile pthread_t Profiler::in_scope_lock = nullptr;
 volatile int Profiler::frame_lock = 0;
 volatile int Profiler::user_threads_lock = 0;
 std::vector<JVMPI_CallFrame> Profiler::call_frames;
@@ -80,9 +79,6 @@ volatile bool Profiler::end_to_end = false;
 pthread_t Profiler::agent_pthread;
 std::atomic_bool Profiler::profile_done(false);
 unsigned long Profiler::experiment_time = MIN_EXP_TIME;
-jobject Profiler::mbean;
-jmethodID Profiler::mbean_cache_method_id;
-JNIEnv * Profiler::jni_;
 
 // How long should we wait before starting an experiment
 unsigned long Profiler::warmup_time = 5000000;
@@ -108,7 +104,7 @@ std::vector<std::string> Profiler::scopes_to_ignore;
 
 void Profiler::ParseOptions(const char *options) {
 
-    if( options == NULL ) {
+    if( options == nullptr ) {
         fprintf(stderr, "Missing options\n");
         print_usage();
         exit(1);
@@ -129,10 +125,10 @@ void Profiler::ParseOptions(const char *options) {
         cmd_line_options.push_back(item);
     }
 
-    for( auto i = cmd_line_options.begin(); i != cmd_line_options.end(); i++ ) {
-        size_t equal_index = i->find('=');
-        std::string option = i->substr(0, equal_index);
-        std::string value = i->substr(equal_index + 1);
+    for(auto & cmd_line_option : cmd_line_options) {
+        size_t equal_index = cmd_line_option.find('=');
+        std::string option = cmd_line_option.substr(0, equal_index);
+        std::string value = cmd_line_option.substr(equal_index + 1);
 
         // extract package
         if( option == "pkg" || option == "package" ) {
@@ -224,27 +220,12 @@ inline long jcoz_sleep(long nanoseconds) {
   return total_sleep.count();
 }
 
-void Profiler::init(){
-  progress_point = new ProgressPoint();
-  progress_point->lineno = -1;
-  progress_point->method_id = nullptr;
-}
-
 jvmtiEnv * Profiler::getJVMTI(){
   return jvmti_;
 }
 
-void Profiler::setScope(std::string package){
-  this->package = package;
-}
-
 bool Profiler::isRunning(){
   return _running;
-}
-
-void Profiler::setProgressPoint(std::string class_name, jint line_no){
-  this->progress_class = class_name;
-  this->progress_point->lineno = line_no;
 }
 
 void Profiler::signal_user_threads() {
@@ -330,7 +311,7 @@ void Profiler::runExperiment(JNIEnv * jni_env) {
 
   char *sig = getClassFromMethodIDLocation(current_experiment.method_id);
   // throw out bad samples
-  if( sig == NULL ) return;
+  if( sig == nullptr ) return;
   cleanSignature(sig);
 
   // printf("Total experiment delay: %ld, total duration: %ld\n", current_experiment.delay, current_experiment.duration);
@@ -359,7 +340,7 @@ void Profiler::runExperiment(JNIEnv * jni_env) {
 
 void JNICALL
 Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
-  srand(time(NULL));
+  srand(time(nullptr));
   global_delay = 0;
   startup_time = std::chrono::high_resolution_clock::now().time_since_epoch();
   agent_pthread = pthread_self();
@@ -367,7 +348,7 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
     ;
   std::atomic_thread_fence(std::memory_order_acquire);
   user_threads.erase(curr_ut);
-  curr_ut = NULL;
+  curr_ut = nullptr;
   user_threads_lock = 0;
   std::atomic_thread_fence(std::memory_order_release);
   //	usleep(warmup_time);
@@ -403,7 +384,7 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
       std::random_shuffle(call_frames.begin(), call_frames.end());
       JVMPI_CallFrame exp_frame;
       jint num_entries;
-      jvmtiLineNumberEntry *entries = NULL;
+      jvmtiLineNumberEntry *entries = nullptr;
       for( int i = 0; i < call_frames.size(); i++ ) {
         exp_frame = call_frames.at(i);
         jvmtiError lineNumberError = jvmti->GetLineNumberTable(exp_frame.method_id, &num_entries, &entries);
@@ -415,7 +396,7 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
       }
 
       // If we don't find anything in scope, try again
-      if( entries == NULL ) {
+      if( entries == nullptr ) {
         // TODO(dcv): Should we clear the call frames here?
         logger->info("No in scope frames found. Trying again.");
         frame_lock = 0;
@@ -530,12 +511,12 @@ void Profiler::addUserThread(jthread thread) {
     user_threads_lock = 0;
     std::atomic_thread_fence(std::memory_order_release);
   } else {
-    curr_ut = NULL;
+    curr_ut = nullptr;
   }
 }
 
 void Profiler::removeUserThread(jthread thread) {
-  if (curr_ut != NULL) {
+  if (curr_ut != nullptr) {
     logger->debug("Removing user thread");
     points_hit += curr_ut->points_hit;
     curr_ut->points_hit = 0;
@@ -631,53 +612,6 @@ void Profiler::addProgressPoint(jint method_count, jmethodID *methods) {
   logger->error("Unable to set progress point");
 }
 
-void Profiler::setMBeanObject(jobject mbean){
-  if (jni_ == nullptr){
-    fprintf(stderr, "jni_ not set\n");
-    fflush(stderr);
-  }
-  Profiler::mbean = jni_->NewGlobalRef(mbean);
-  if (Profiler::mbean == nullptr){
-    fprintf(stderr, "error setting global ref\n");
-    fflush(stderr);
-  }
-  jclass mbeanClass = jni_->GetObjectClass(Profiler::mbean);
-  if (mbeanClass == nullptr){
-    fprintf(stderr, "could not get mbean class\n");
-    fflush(stderr);
-  }
-  mbean_cache_method_id = jni_->GetMethodID(mbeanClass, "cacheOutput", "(Ljava/lang/String;IFJJ)V");
-  if (Profiler::mbean_cache_method_id == nullptr){
-    fprintf(stderr, "could not get method id\n");
-    fflush(stderr);
-  }
-}
-
-jobject Profiler::getMBeanObject(){
-  return Profiler::mbean;
-}
-
-void Profiler::clearMBeanObject(){
-  jni_->DeleteGlobalRef(Profiler::mbean);
-}
-
-void Profiler::setJNI(JNIEnv* jni){
-  jni_ = jni;
-}
-
-void Profiler::collectScopesToIgnore(std::string const& scopes_to_ignore_file_path) {
-    logger->info("Start collecting scopes to ignore");
-    std::string next_scope;
-    std::ifstream file(scopes_to_ignore_file_path);
-    if (file.is_open()) {
-        while (getline(file, next_scope)) {
-            canonicalize(next_scope);
-            addScopeToIgnore(next_scope);
-        }
-    }
-    logger->info("End collecting scopes to ignore");
-}
-
 void Profiler::canonicalize(std::string& scope) {
     std::replace(scope.begin(), scope.end(), '.', '/');
 }
@@ -695,7 +629,7 @@ void Profiler::Handle(int signum, siginfo_t *info, void *context) {
   IMPLICITLY_USE(info);
 
   JNIEnv *env = Accessors::CurrentJniEnv();
-  if (env == NULL) {
+  if (env == nullptr) {
 
     return;
   }
@@ -786,7 +720,7 @@ void Profiler::Handle(int signum, siginfo_t *info, void *context) {
 struct sigaction SignalHandler::SetAction(
     void (*action)(int, siginfo_t *, void *)) {
   struct sigaction sa;
-  sa.sa_handler = NULL;
+  sa.sa_handler = nullptr;
   sa.sa_sigaction = action;
   sa.sa_flags = SA_RESTART | SA_SIGINFO;
 
@@ -816,38 +750,16 @@ char *Profiler::getClassFromMethodIDLocation(jmethodID id) {
   jclass clazz;
   jvmtiError classErr = jvmti->GetMethodDeclaringClass(id, &clazz);
   if (classErr != JVMTI_ERROR_NONE) {
-    return NULL;
+    return nullptr;
   }
 
   char *sig;
-  jvmtiError classSigErr = jvmti->GetClassSignature(clazz, &sig, NULL);
+  jvmtiError classSigErr = jvmti->GetClassSignature(clazz, &sig, nullptr);
   if (classSigErr != JVMTI_ERROR_NONE) {
-    return NULL;
+    return nullptr;
   }
 
   return sig;
-}
-
-void Profiler::printInScopeLineNumberMapping() {
-  for (auto id : in_scope_ids) {
-    jmethodID mid = (jmethodID) id;
-    char * sig = getClassFromMethodIDLocation(mid);
-    char * name;
-    jvmti->GetMethodName(mid, &name, nullptr, nullptr);
-    printf("sig: %s method: %s\n", sig, name);
-    jint entry_count;
-    JvmtiScopedPtr<jvmtiLineNumberEntry> entries(jvmti);
-    jvmtiError err = jvmti->GetLineNumberTable(mid, &entry_count, entries.GetRef());
-    if( err != JVMTI_ERROR_NONE ) {
-      return;
-    }
-
-    for (int j = 0; j < entry_count; j++) {
-      printf("start_location %ld , line_no: %d\n",
-          entries.Get()[j].start_location, entries.Get()[j].line_number);
-    }
-
-  }
 }
 
 void Profiler::cleanSignature(char *sig) {

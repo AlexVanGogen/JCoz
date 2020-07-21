@@ -20,7 +20,7 @@
  */
 
 #include <jvmti.h>
-#include <stdio.h>
+#include <cstdio>
 
 #include <string>
 

@@ -19,10 +19,8 @@
  * a copy of the license that was included with that original work.
  */
 
-#include <stdio.h>
-#include <limits.h>
-#include <string.h>
-#include <unistd.h>
+#include <cstdio>
+#include <cstring>
 
 #include <string>
 
@@ -76,13 +74,13 @@ jthread create_thread(JNIEnv *jni_env) {
   auto logger = prof->getLogger();
   logger->info("Creating a thread in create_thread");
   jclass cls = jni_env->FindClass("java/lang/Thread");
-  if( cls == NULL ) {
+  if( cls == nullptr ) {
     exit(1);
   }
   const char *method = "<init>";
   jmethodID methodId = jni_env->GetMethodID(cls, method, "()V");
 
-  if( methodId == NULL ) {
+  if( methodId == nullptr ) {
     exit(1);
   }
 
@@ -100,7 +98,7 @@ static bool updateEventsEnabledState(jvmtiEnv *jvmti, jvmtiEventMode enabledStat
   auto logger = prof->getLogger();
   logger->info("Setting CLASS_PREPARE to enabled");
   JVMTI_ERROR_1(
-      (jvmti->SetEventNotificationMode(enabledState, JVMTI_EVENT_CLASS_PREPARE, NULL)),
+      (jvmti->SetEventNotificationMode(enabledState, JVMTI_EVENT_CLASS_PREPARE, nullptr)),
       false);
 
   return true;
@@ -151,11 +149,11 @@ void CreateJMethodIDsForClass(jvmtiEnv *jvmti, jclass klass) {
 //  logger->info("Got class methods from the JVM");
   if (e != JVMTI_ERROR_NONE) {
     JvmtiScopedPtr<char> ksig(jvmti);
-    JVMTI_ERROR((jvmti->GetClassSignature(klass, ksig.GetRef(), NULL)));
+    JVMTI_ERROR((jvmti->GetClassSignature(klass, ksig.GetRef(), nullptr)));
     logger->error("Failed to create method IDs for methods in class {} with error {}", ksig.Get(), e);
   } else {
     JvmtiScopedPtr<char> ksig(jvmti);
-    jvmti->GetClassSignature(klass, ksig.GetRef(), NULL);
+    jvmti->GetClassSignature(klass, ksig.GetRef(), nullptr);
 
 //    logger->info(
 //        "Creating JMethod IDs. [Class: {class}] [Scope: {scope}]",
@@ -282,7 +280,7 @@ static bool RegisterJvmti(jvmtiEnv *jvmti) {
   logger->info("Setting event notification mode to JVMTI_ENABLE in Register Jvmti");
   for (int i = 0; i < num_events; i++) {
     JVMTI_ERROR_1(
-        (jvmti->SetEventNotificationMode(JVMTI_ENABLE, events[i], NULL)),
+        (jvmti->SetEventNotificationMode(JVMTI_ENABLE, events[i], nullptr)),
         false);
   }
   logger->info("Event notifications successfully enabled");
@@ -295,7 +293,7 @@ static bool RegisterJvmti(jvmtiEnv *jvmti) {
 static void SetFileFromOption(char *equals) {
   char *name_begin = equals + 1;
   char *name_end;
-  if ((name_end = strchr(equals, ',')) == NULL) {
+  if ((name_end = strchr(equals, ',')) == nullptr) {
     name_end = equals + strlen(equals);
   }
   size_t len = POSITIVE(name_end - name_begin);
@@ -307,9 +305,9 @@ static void SetFileFromOption(char *equals) {
     Globals::OutFile = stdout;
   } else {
     Globals::OutFile = fopen(file_name, "w+");
-    if (Globals::OutFile == NULL) {
+    if (Globals::OutFile == nullptr) {
       fprintf(stderr, "Could not open file %s: ", file_name);
-      perror(NULL);
+      perror(nullptr);
       exit(1);
     }
   }
