@@ -39,7 +39,7 @@ jvmtiError run_profiler(JNIEnv* jni);
 void JNICALL OnThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni_env,
     jthread thread) {
   auto logger = prof->getLogger();
-  logger->info("OnThreadStart fired");
+  logger->debug("OnThreadStart fired");
   IMPLICITLY_USE(jvmti_env);
   IMPLICITLY_USE(thread);
   Accessors::SetCurrentJniEnv(jni_env);
@@ -49,7 +49,7 @@ void JNICALL OnThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni_env,
 
 void JNICALL OnThreadEnd(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread) {
   auto logger = prof->getLogger();
-  logger->info("OnThreadEnd fired");
+  logger->debug("OnThreadEnd fired");
   IMPLICITLY_USE(jvmti_env);
   IMPLICITLY_USE(jni_env);
   IMPLICITLY_USE(thread);
@@ -72,7 +72,7 @@ void JNICALL OnClassLoad(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
 // to run profiler thread
 jthread create_thread(JNIEnv *jni_env) {
   auto logger = prof->getLogger();
-  logger->info("Creating a thread in create_thread");
+  logger->debug("Creating a thread in create_thread");
   jclass cls = jni_env->FindClass("java/lang/Thread");
   if( cls == nullptr ) {
     exit(1);
@@ -150,14 +150,14 @@ void CreateJMethodIDsForClass(jvmtiEnv *jvmti, jclass klass) {
   if (e != JVMTI_ERROR_NONE) {
     JvmtiScopedPtr<char> ksig(jvmti);
     JVMTI_ERROR((jvmti->GetClassSignature(klass, ksig.GetRef(), nullptr)));
-    logger->error("Failed to create method IDs for methods in class {} with error {}", ksig.Get(), e);
+    logger->debug("Failed to create method IDs for methods in class {} with error {}", ksig.Get(), e);
   } else {
     JvmtiScopedPtr<char> ksig(jvmti);
     jvmti->GetClassSignature(klass, ksig.GetRef(), nullptr);
 
-//    logger->info(
-//        "Creating JMethod IDs. [Class: {class}] [Scope: {scope}]",
-//        fmt::arg("class", ksig.Get()), fmt::arg("scope", prof->getPackage()));
+    logger->debug(
+        "Creating JMethod IDs. [Class: {class}] [Scope: {scope}]",
+        fmt::arg("class", ksig.Get()), fmt::arg("scope", prof->getPackage()));
     if( isInAllowedScope(ksig.Get(), prof->getPackage().c_str()) ) {
       prof->addInScopeMethods(method_count, methods.Get());
     }
@@ -370,7 +370,7 @@ jvmtiError run_profiler(JNIEnv* jni)
         jclass next_loaded_class = loaded_classes[i];
         JvmtiScopedPtr<char> ksig(jvmti);
         jvmti->GetClassSignature(next_loaded_class, ksig.GetRef(), nullptr);
-        prof->getLogger()->info("Loading class {}", ksig.Get());
+        prof->getLogger()->debug("Loading class {}", ksig.Get());
         CreateJMethodIDsForClass(jvmti, next_loaded_class);
     }
 

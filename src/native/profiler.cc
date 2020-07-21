@@ -335,7 +335,7 @@ void Profiler::runExperiment(JNIEnv * jni_env) {
   delete[] current_experiment.location_ranges;
   free(sig);
 
-  logger->info("Finished experiment, flushed logs, and delete current location ranges.");
+  logger->debug("Finished experiment, flushed logs, and delete current location ranges.");
 }
 
 void JNICALL
@@ -355,7 +355,7 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
   prof_ready = true;
 
   while (_running) {
-    logger->info("Starting new agent thread _running loop...");
+    logger->debug("Starting new agent thread _running loop...");
     // 15 * SIGNAL_FREQ with randomization should give us roughly
     // the same number of iterations as doing 10 * SIGNAL_FREQ without
     // randomization.
@@ -398,7 +398,7 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
       // If we don't find anything in scope, try again
       if( entries == nullptr ) {
         // TODO(dcv): Should we clear the call frames here?
-        logger->info("No in scope frames found. Trying again.");
+        logger->debug("No in scope frames found. Trying again.");
         frame_lock = 0;
         std::atomic_thread_fence(std::memory_order_release);
         continue;
@@ -463,7 +463,7 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
       jvmti->Deallocate((unsigned char *)entries);
       logger->debug("Finished clearing frames and deallocating entries...");
     } else {
-      logger->info("No frames found in agent thread. Trying sampling loop again...");
+      logger->debug("No frames found in agent thread. Trying sampling loop again...");
       frame_lock = 0;
       std::atomic_thread_fence(std::memory_order_release);
     }
