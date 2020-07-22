@@ -336,8 +336,6 @@ void Profiler::runExperiment(JNIEnv * jni_env) {
   logger->flush();
 
   delete[] current_experiment.location_ranges;
-  free(sig);
-
   logger->debug("Finished experiment, flushed logs, and delete current location ranges.");
 }
 
@@ -864,6 +862,7 @@ std::vector<std::string> bci_hits::create_dump()
             }
             result.emplace_back(ss.str());
         }
+        free(class_fqn);
     }
     return result;
 }
