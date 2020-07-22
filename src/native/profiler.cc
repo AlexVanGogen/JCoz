@@ -272,7 +272,7 @@ float Profiler::calculate_random_speedup() {
 }
 
 void Profiler::runExperiment(JNIEnv * jni_env) {
-  logger->info("Running experiment");
+  logger->debug("Running experiment");
   in_experiment = true;
   points_hit = 0;
 
@@ -594,7 +594,7 @@ void Profiler::addProgressPoint(jint method_count, jmethodID *methods) {
     JvmtiScopedPtr<jvmtiLineNumberEntry> entries(jvmti);
     jvmtiError err = jvmti->GetLineNumberTable(methods[i], &entry_count, entries.GetRef());
     if( err != JVMTI_ERROR_NONE ) {
-      logger->warn("Error getting line number entry table in addProgressPoint. Error: %d\n", err);
+      logger->warn("Error getting line number entry table in addProgressPoint. Error: {}", err);
 
       continue;
     }
