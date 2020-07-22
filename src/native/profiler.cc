@@ -329,10 +329,10 @@ void Profiler::runExperiment(JNIEnv * jni_env) {
   bci_hits::add_hit(sig, current_experiment.method_id, current_experiment.lineno, current_experiment.bci);
 
   // Log the run experiment results
-  logger->info("experiment\tselected={class}:{line_no}|{bci}\tspeedup={speedup}\tduration={duration}\nprogress-point\tname=end-to-end\ttype=source\tdelta={points_hit}",
+  logger->info("experiment\tselected={class}:{line_no}\tspeedup={speedup}\tduration={duration}\nprogress-point\tname=end-to-end\ttype=source\tdelta={points_hit}",
           fmt::arg("speedup", current_experiment.speedup), fmt::arg("points_hit", current_experiment.points_hit),
           fmt::arg("duration", current_experiment.duration - current_experiment.delay), fmt::arg("class", sig),
-          fmt::arg("line_no", current_experiment.lineno), fmt::arg("bci", current_experiment.bci));
+          fmt::arg("line_no", current_experiment.lineno));
   logger->flush();
 
   delete[] current_experiment.location_ranges;
