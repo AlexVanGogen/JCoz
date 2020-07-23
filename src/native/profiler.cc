@@ -65,7 +65,7 @@ thread_local struct UserThread *curr_ut;
 // Initialize static Profiler variables here
 std::unordered_set<void *> Profiler::in_scope_ids;
 volatile bool Profiler::in_experiment = false;
-volatile pthread_t Profiler::in_scope_lock = nullptr;
+volatile pthread_t Profiler::in_scope_lock = 0;
 volatile int Profiler::frame_lock = 0;
 volatile int Profiler::user_threads_lock = 0;
 std::vector<JVMPI_CallFrame> Profiler::call_frames;
