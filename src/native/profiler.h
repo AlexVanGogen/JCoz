@@ -216,6 +216,8 @@ private:
 
     static bool fix_exp;
 
+    static bool print_traces;
+
     static std::shared_ptr<spdlog::logger> logger;
 
     static std::vector<std::string> scopes_to_ignore;

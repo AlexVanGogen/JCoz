@@ -34,19 +34,19 @@
 #include <map>
 #include <vector>
 
-void StackTracesPrinter::PrintStackTraces(TraceData *traces, int length) {
+void StackTracesPrinter::PrintStackTraces(TraceData *traces, int length, int selected_index) {
   int count = 0;
   int total = 0;
   for (int i = 0; i < length; i++) {
     if (traces[i].count != 0) {
       total += traces[i].count;
       count++;
-      fprintf(file_, "%" PRIdPTR " ", traces[i].count);
-      PrintStackTrace(&traces[i]);
+//      fprintf(file_, "%" PRIdPTR " ", traces[i].count);
+      PrintStackTrace(&traces[i], selected_index);
       fprintf(file_, "\n");
     }
   }
-  fprintf(file_, "Total trace count = %d, Total traces = %d\n", total, count);
+//  fprintf(file_, "Total trace count = %d, Total traces = %d\n\n", total, count);
 }
 
 typedef std::pair<jint, jmethodID> PairCallFrame;
@@ -104,7 +104,7 @@ void StackTracesPrinter::PrintLeafHistogram(TraceData *traces, int length) {
       continue;
     }
     fprintf(file_, "%10d ", count);
-    PrintStackFrame(&curr_frame);
+      PrintStackFrame(&curr_frame, false);
     last = curr_frame;
   }
 }
@@ -236,7 +236,7 @@ bool StackTracesPrinter::GetStackFrameElements(JVMPI_CallFrame *frame,
   return true;
 }
 
-bool StackTracesPrinter::PrintStackFrame(JVMPI_CallFrame *frame) {
+bool StackTracesPrinter::PrintStackFrame(JVMPI_CallFrame *frame, bool was_selected) {
   if (frame->lineno == -99) {
     // This should never happen in a stock hotspot build
     return false;
@@ -246,21 +246,26 @@ bool StackTracesPrinter::PrintStackFrame(JVMPI_CallFrame *frame) {
   int line_num;
   GetStackFrameElements(frame, &file_name, &class_name, &method_name,
       &line_num);
-  fprintf(file_, "\t%s.%s(%s:%d)\n", class_name.c_str(), method_name.c_str(),
+  fprintf(file_, "%s.%s(%s:%d)", class_name.c_str(), method_name.c_str(),
       file_name.c_str(), line_num);
+  if (was_selected)
+  {
+      fprintf(file_, " (*)");
+  }
+  fprintf(file_, "\n");
   return true;
 }
 
-void StackTracesPrinter::PrintStackTrace(TraceData *trace) {
+void StackTracesPrinter::PrintStackTrace(TraceData *trace, int selected_index) {
   JVMPI_CallTrace *t = &(trace->trace);
   if (t->num_frames < 0) {
     // Error trace - don't bother to print it.
     return;
   }
 
-  fprintf(file_, "%d ", t->num_frames);
+//  fprintf(file_, "%d ", t->num_frames);
   for (int i = 0; i < t->num_frames; i++) {
     JVMPI_CallFrame *curr_frame = &(t->frames[i]);
-    PrintStackFrame(curr_frame);
+    PrintStackFrame(curr_frame, selected_index == i);
   }
 }

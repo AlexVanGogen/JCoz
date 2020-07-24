@@ -95,6 +95,7 @@ static std::atomic<int> call_index(0);
 static JVMPI_CallFrame static_call_frames[NUM_CALL_FRAMES];
 
 bool Profiler::fix_exp = false;
+bool Profiler::print_traces = false;
 
 nanoseconds_type startup_time;
 
@@ -102,6 +103,8 @@ nanoseconds_type startup_time;
 std::shared_ptr<spdlog::logger> Profiler::logger = spdlog::basic_logger_mt("basic_logger", "log.txt");
 
 std::vector<std::string> Profiler::scopes_to_ignore;
+StackTracesPrinter* printer;
+FILE *traces_file;
 
 void Profiler::ParseOptions(const char *options) {
 
@@ -162,6 +165,8 @@ void Profiler::ParseOptions(const char *options) {
                 canonicalize(item);
                 Profiler::addScopeToIgnore(item);
             }
+        } else if (option == "traces") {
+            print_traces = true;
         }
     }
 
@@ -183,8 +188,9 @@ void Profiler::ParseOptions(const char *options) {
                  "\tscopes to ignore: {}\n"
                  "\twarmup: {}us\n"
                  "\tend-to-end: {}\n"
-                 "\tfixed experiment duration: {}",
-            progress_class, progress_point->lineno, Profiler::package, joint_scopes, warmup_time, end_to_end, fix_exp);
+                 "\tfixed experiment duration: {}\n"
+                 "\tprint stacktraces: {}",
+            progress_class, progress_point->lineno, Profiler::package, joint_scopes, warmup_time, end_to_end, fix_exp, print_traces);
     if( Profiler::package.empty() || (!end_to_end && (progress_class.empty() || progress_point->lineno == -1)) ) {
         fprintf(stderr, "Missing package, progress class, or progress point\n");
         print_usage();
@@ -345,6 +351,13 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
   global_delay = 0;
   startup_time = std::chrono::high_resolution_clock::now().time_since_epoch();
   agent_pthread = pthread_self();
+
+  if (print_traces)
+  {
+    traces_file = fopen("traces.txt", "w");
+    printer = new StackTracesPrinter(traces_file, jvmti_env);
+  }
+
   while (!__sync_bool_compare_and_swap(&user_threads_lock, 0, 1))
     ;
   std::atomic_thread_fence(std::memory_order_acquire);
@@ -357,6 +370,16 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
 
   while (_running) {
     logger->debug("Starting new agent thread _running loop...");
+
+    if (print_traces)
+    {
+      while (!__sync_bool_compare_and_swap(&frame_lock, 0, 1));
+      std::atomic_thread_fence(std::memory_order_acquire);
+      fprintf(traces_file, "\n===================== Started next experiment =====================\n");
+      frame_lock = 0;
+      std::atomic_thread_fence(std::memory_order_release);
+    }
+
     // 15 * SIGNAL_FREQ with randomization should give us roughly
     // the same number of iterations as doing 10 * SIGNAL_FREQ without
     // randomization.
@@ -403,6 +426,12 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
         frame_lock = 0;
         std::atomic_thread_fence(std::memory_order_release);
         continue;
+      }
+
+      if (print_traces)
+      {
+        fprintf(traces_file, "Selected experiment:\n");
+        printer->PrintStackFrame(&exp_frame, false);
       }
 
       logger->debug("Found in scope frames. Choosing a frame and running experiment...");
@@ -468,6 +497,12 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
       frame_lock = 0;
       std::atomic_thread_fence(std::memory_order_release);
     }
+  }
+
+  if (print_traces)
+  {
+    delete printer;
+    fclose(traces_file);
   }
 
   logger->info("Profiler done running...");
@@ -682,6 +717,11 @@ void Profiler::Handle(int signum, siginfo_t *info, void *context) {
         int index = call_index.fetch_add(1);
         if (index < NUM_CALL_FRAMES) {
           static_call_frames[index] = curr_frame;
+        }
+        if (print_traces)
+        {
+          struct TraceData data{1, trace};
+          printer->PrintStackTraces(&data, 1, i);
         }
         frame_lock = 0;
         std::atomic_thread_fence(std::memory_order_release);
