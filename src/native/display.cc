@@ -104,7 +104,7 @@ void StackTracesPrinter::PrintLeafHistogram(TraceData *traces, int length) {
       continue;
     }
     fprintf(file_, "%10d ", count);
-      PrintStackFrame(&curr_frame, false);
+    PrintStackFrame(&curr_frame, false, false);
     last = curr_frame;
   }
 }
@@ -236,7 +236,7 @@ bool StackTracesPrinter::GetStackFrameElements(JVMPI_CallFrame *frame,
   return true;
 }
 
-bool StackTracesPrinter::PrintStackFrame(JVMPI_CallFrame *frame, bool was_selected) {
+bool StackTracesPrinter::PrintStackFrame(JVMPI_CallFrame *frame, bool is_candidate, bool is_selected) {
   if (frame->lineno == -99) {
     // This should never happen in a stock hotspot build
     return false;
@@ -248,9 +248,13 @@ bool StackTracesPrinter::PrintStackFrame(JVMPI_CallFrame *frame, bool was_select
       &line_num);
   fprintf(file_, "%s.%s(%s:%d)", class_name.c_str(), method_name.c_str(),
       file_name.c_str(), line_num);
-  if (was_selected)
+  if (is_candidate)
   {
-      fprintf(file_, " (*)");
+    fprintf(file_, " (*)");
+    if (is_selected)
+    {
+      fprintf(file_, " (***)");
+    }
   }
   fprintf(file_, "\n");
   return true;
@@ -266,6 +270,23 @@ void StackTracesPrinter::PrintStackTrace(TraceData *trace, int selected_index) {
 //  fprintf(file_, "%d ", t->num_frames);
   for (int i = 0; i < t->num_frames; i++) {
     JVMPI_CallFrame *curr_frame = &(t->frames[i]);
-    PrintStackFrame(curr_frame, selected_index == i);
+    PrintStackFrame(curr_frame, selected_index == i, false);
   }
+}
+
+void StackTracesPrinter::PrintStackTrace(candidate_trace &trace)
+{
+  JVMPI_CallTrace* t = &trace.trace;
+  if (t->num_frames < 0)
+  {
+    // Error trace - don't bother to print it.
+    return;
+  }
+
+  for (int i = 0; i < t->num_frames; ++i)
+  {
+    JVMPI_CallFrame *curr_frame = &(t->frames[i]);
+    PrintStackFrame(curr_frame, trace.selected_frame_idx == i, trace.is_selected);
+  }
+  fprintf(file_, "\n");
 }

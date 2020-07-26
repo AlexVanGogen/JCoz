@@ -44,9 +44,11 @@ class StackTracesPrinter {
 
     void PrintStackTraces(TraceData *traces, int length, int i);
 
-    bool PrintStackFrame(JVMPI_CallFrame *frame, bool b);
+    bool PrintStackFrame(JVMPI_CallFrame *frame, bool b, bool b1);
 
     void PrintLeafHistogram(TraceData *traces, int length);
+
+    void PrintStackTrace(candidate_trace& trace);
 
   private:
     FILE *file_;

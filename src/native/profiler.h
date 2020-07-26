@@ -94,6 +94,13 @@ struct TraceData {
   JVMPI_CallTrace trace;
 };
 
+struct candidate_trace
+{
+  JVMPI_CallTrace trace;
+  uint16_t selected_frame_idx;
+  bool is_selected;
+};
+
 class Profiler {
   public:
     explicit Profiler(jvmtiEnv *jvmti) : jvmti_(jvmti) {}

@@ -103,6 +103,10 @@ nanoseconds_type startup_time;
 std::shared_ptr<spdlog::logger> Profiler::logger = spdlog::basic_logger_mt("basic_logger", "log.txt");
 
 std::vector<std::string> Profiler::scopes_to_ignore;
+JVMPI_CallFrame frame_buffer[kMaxStackTraces][kMaxFramesToCapture];
+static candidate_trace traces[kMaxStackTraces];
+static uint16_t trace_idx = 0;
+
 StackTracesPrinter* printer;
 FILE *traces_file;
 
@@ -345,6 +349,15 @@ void Profiler::runExperiment(JNIEnv * jni_env) {
   logger->debug("Finished experiment, flushed logs, and delete current location ranges.");
 }
 
+void random_permutation(uint16_t* result, uint16_t size)
+{
+  for (uint16_t i = 0; i < size; ++i)
+  {
+    result[i] = i;
+  }
+  std::random_shuffle(result, result + size);
+}
+
 void JNICALL
 Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
   srand(time(nullptr));
@@ -375,7 +388,6 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
     {
       while (!__sync_bool_compare_and_swap(&frame_lock, 0, 1));
       std::atomic_thread_fence(std::memory_order_acquire);
-      fprintf(traces_file, "\n===================== Started next experiment =====================\n");
       frame_lock = 0;
       std::atomic_thread_fence(std::memory_order_release);
     }
@@ -402,17 +414,21 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
     for (int i = 0; (i < call_index) && (i < NUM_CALL_FRAMES); i++) {
       call_frames.push_back(static_call_frames[i]);
     }
-    if (call_frames.size() > 0) {
+    uint16_t num_frames = call_frames.size();
+    if (num_frames > 0) {
       logger->debug("Had {} call frames. Checking for in scope call frame...", call_frames.size());
       call_index = 0;
-      std::random_shuffle(call_frames.begin(), call_frames.end());
+      uint16_t permutation[num_frames];
+      random_permutation(permutation, num_frames);
       JVMPI_CallFrame exp_frame;
       jint num_entries;
       jvmtiLineNumberEntry *entries = nullptr;
-      for( int i = 0; i < call_frames.size(); i++ ) {
-        exp_frame = call_frames.at(i);
+      for( int i = 0; i < num_frames; i++ ) {
+        uint16_t j = permutation[i];
+        exp_frame = call_frames.at(j);
         jvmtiError lineNumberError = jvmti->GetLineNumberTable(exp_frame.method_id, &num_entries, &entries);
         if( lineNumberError == JVMTI_ERROR_NONE ) {
+          traces[j].is_selected = true;
           break;
         } else {
           jvmti->Deallocate((unsigned char *)entries);
@@ -423,6 +439,7 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
       if( entries == nullptr ) {
         // TODO(dcv): Should we clear the call frames here?
         logger->debug("No in scope frames found. Trying again.");
+        trace_idx = 0;
         frame_lock = 0;
         std::atomic_thread_fence(std::memory_order_release);
         continue;
@@ -430,8 +447,12 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
 
       if (print_traces)
       {
-        fprintf(traces_file, "Selected experiment:\n");
-        printer->PrintStackFrame(&exp_frame, false);
+        fprintf(traces_file, "===================== Started next experiment. Select traces... =====================\n");
+        for (uint16_t i = 0; i < trace_idx; ++i)
+        {
+          printer->PrintStackTrace(traces[i]);
+        }
+        trace_idx = 0;
       }
 
       logger->debug("Found in scope frames. Choosing a frame and running experiment...");
@@ -488,6 +509,7 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
       std::atomic_thread_fence(std::memory_order_acquire);
       call_frames.clear();
       memset(static_call_frames, 0, NUM_CALL_FRAMES * sizeof(JVMPI_CallFrame));
+      trace_idx = 0;
       frame_lock = 0;
       std::atomic_thread_fence(std::memory_order_release);
       jvmti->Deallocate((unsigned char *)entries);
@@ -720,8 +742,22 @@ void Profiler::Handle(int signum, siginfo_t *info, void *context) {
         }
         if (print_traces)
         {
-          struct TraceData data{1, trace};
-          printer->PrintStackTraces(&data, 1, i);
+          JVMPI_CallFrame *fb = frame_buffer[trace_idx];
+          for (int frame_num = 0; frame_num < trace.num_frames; ++frame_num)
+          {
+            base = reinterpret_cast<char *>(&(fb[frame_num]));
+            // Make sure the padding is all set to 0.
+            for (char *p = base; p < base + sizeof(JVMPI_CallFrame); p++) {
+              *p = 0;
+            }
+            fb[frame_num].lineno = trace.frames[frame_num].lineno;
+            fb[frame_num].method_id = trace.frames[frame_num].method_id;
+          }
+          traces[trace_idx].trace.frames = fb;
+          traces[trace_idx].trace.num_frames = trace.num_frames;
+          traces[trace_idx].selected_frame_idx = i;
+          traces[trace_idx].is_selected = false;
+          trace_idx = (trace_idx + 1) % kMaxStackTraces;
         }
         frame_lock = 0;
         std::atomic_thread_fence(std::memory_order_release);
