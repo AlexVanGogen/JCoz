@@ -147,6 +147,8 @@ class Profiler {
 
     static bool isRunning();
 
+    static void add_prohibited(jmethodID);
+    static bool is_prohibited(jmethodID);
 private:
 
     DISALLOW_COPY_AND_ASSIGN(Profiler);
@@ -228,6 +230,8 @@ private:
     static std::shared_ptr<spdlog::logger> logger;
 
     static std::vector<std::string> scopes_to_ignore;
+
+    static std::unordered_set<jmethodID> prohibited_methods;
 };
 
 #endif  // PROFILER_H

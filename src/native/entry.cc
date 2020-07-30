@@ -36,8 +36,10 @@ static bool acquireCreateLock(); static void releaseCreateLock();
 
 jvmtiError run_profiler(JNIEnv* jni);
 
+bool is_unsafe(char *class_sig);
+
 void JNICALL OnThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni_env,
-    jthread thread) {
+                           jthread thread) {
   auto logger = prof->getLogger();
   logger->debug("OnThreadStart fired");
   IMPLICITLY_USE(jvmti_env);
@@ -158,6 +160,20 @@ void CreateJMethodIDsForClass(jvmtiEnv *jvmti, jclass klass) {
     logger->debug(
         "Creating JMethod IDs. [Class: {class}] [Scope: {scope}]",
         fmt::arg("class", ksig.Get()), fmt::arg("scope", prof->getPackage()));
+    if (is_unsafe(ksig.Get()))
+    {
+        prof->getLogger()->info("checking class {}", ksig.Get());
+        for (int i = 0; i < method_count; ++i)
+        {
+            jmethodID method_id = methods.Get()[i];
+            char* method_name;
+            jvmti->GetMethodName(method_id, &method_name, nullptr, nullptr);
+            if (strcmp(method_name, "park") == 0)
+            {
+                Profiler::add_prohibited(method_id);
+            }
+        }
+    }
     if( isInAllowedScope(ksig.Get(), prof->getPackage().c_str()) ) {
       prof->addInScopeMethods(method_count, methods.Get());
     }
@@ -172,6 +188,11 @@ void CreateJMethodIDsForClass(jvmtiEnv *jvmti, jclass klass) {
   if (releaseLock) {
     releaseCreateLock();
   }
+}
+
+bool is_unsafe(char *class_sig)
+{
+    return strcmp(class_sig, "Ljdk/internal/misc/Unsafe;") == 0;
 }
 
 void JNICALL OnVMInit(jvmtiEnv *jvmti, JNIEnv *jni_env, jthread thread) {

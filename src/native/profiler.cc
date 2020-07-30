@@ -90,6 +90,7 @@ struct ProgressPoint* Profiler::progress_point = nullptr;
 std::string Profiler::progress_class;
 std::map<jmethodID, std::map<jint, bci_hits::hit_freq_t>> bci_hits::_freqs;
 std::map<jmethodID, char*> bci_hits::_declaring_classes;
+std::unordered_set<jmethodID> Profiler::prohibited_methods;
 
 static std::atomic<int> call_index(0);
 static JVMPI_CallFrame static_call_frames[NUM_CALL_FRAMES];
@@ -731,6 +732,9 @@ void Profiler::Handle(int signum, siginfo_t *info, void *context) {
     std::atomic_thread_fence(std::memory_order_acquire);
     for (int i = 0; i < trace.num_frames; i++) {
       JVMPI_CallFrame &curr_frame = trace.frames[i];
+      // if sampled stack trace contains one of prohibited methods, reject the whole trace
+      if (is_prohibited(curr_frame.method_id)) break;
+
       if (frameInScope(curr_frame)) {
         // lock frame lock
         while (!__sync_bool_compare_and_swap(&frame_lock, 0, 1))
@@ -911,6 +915,16 @@ Profiler::HandleBreakpoint(
     jlocation location
     ) {
   curr_ut->points_hit += in_experiment;
+}
+
+void Profiler::add_prohibited(jmethodID method_id)
+{
+    prohibited_methods.emplace(method_id);
+}
+
+bool Profiler::is_prohibited(jmethodID method_id)
+{
+    return prohibited_methods.find(method_id) != prohibited_methods.end();
 }
 
 void bci_hits::add_hit(char* class_fqn, jmethodID method_id, jint line_number, jint bci)
