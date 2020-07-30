@@ -383,7 +383,8 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
   prof_ready = true;
 
   while (_running) {
-    logger->debug("Starting new agent thread _running loop...");
+    logger->info("Starting new agent thread _running loop...");
+    logger->flush();
 
     if (print_traces)
     {
@@ -417,7 +418,7 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
     }
     uint16_t num_frames = call_frames.size();
     if (num_frames > 0) {
-      logger->debug("Had {} call frames. Checking for in scope call frame...", call_frames.size());
+      logger->info("Had {} call frames. Checking for in scope call frame...", call_frames.size());
       call_index = 0;
       uint16_t permutation[num_frames];
       random_permutation(permutation, num_frames);
@@ -426,6 +427,8 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
       jvmtiLineNumberEntry *entries = nullptr;
       for( int i = 0; i < num_frames; i++ ) {
         uint16_t j = permutation[i];
+        logger->info("Analysing frame #{}", j);
+        logger->flush();
         exp_frame = call_frames.at(j);
         jvmtiError lineNumberError = jvmti->GetLineNumberTable(exp_frame.method_id, &num_entries, &entries);
         if( lineNumberError == JVMTI_ERROR_NONE ) {
@@ -514,7 +517,7 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
       frame_lock = 0;
       std::atomic_thread_fence(std::memory_order_release);
       jvmti->Deallocate((unsigned char *)entries);
-      logger->debug("Finished clearing frames and deallocating entries...");
+      logger->info("Finished clearing frames and deallocating entries...");
     } else {
       logger->debug("No frames found in agent thread. Trying sampling loop again...");
       frame_lock = 0;
