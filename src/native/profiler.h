@@ -33,6 +33,8 @@
 #include "globals.h"
 #include "stacktraces.h"
 #include "spdlog/spdlog.h"
+#include "spdlog/sinks/stdout_sinks.h"
+
 #ifdef SPDLOG_VERSION
 #include "spdlog/sinks/basic_file_sink.h"
 #endif
@@ -115,7 +117,7 @@ class Profiler {
 
     static std::string &getProgressClass() { return progress_class; }
 
-    static std::shared_ptr<spdlog::logger> &getLogger() { return logger; };
+    static std::shared_ptr<spdlog::logger> &get_console_logger() { return console_logger; };
 
     static std::vector<std::string>& getScopesToIgnore() { return scopes_to_ignore; }
 
@@ -227,7 +229,8 @@ private:
 
     static bool print_traces;
 
-    static std::shared_ptr<spdlog::logger> logger;
+    static std::shared_ptr<spdlog::logger> console_logger;
+    static std::shared_ptr<spdlog::logger> jcoz_logger;
 
     static std::vector<std::string> scopes_to_ignore;
 

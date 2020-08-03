@@ -40,7 +40,7 @@ bool is_unsafe(char *class_sig);
 
 void JNICALL OnThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni_env,
                            jthread thread) {
-  auto logger = prof->getLogger();
+  auto logger = prof->get_console_logger();
   logger->debug("OnThreadStart fired");
   IMPLICITLY_USE(jvmti_env);
   IMPLICITLY_USE(thread);
@@ -50,7 +50,7 @@ void JNICALL OnThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni_env,
 }
 
 void JNICALL OnThreadEnd(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread) {
-  auto logger = prof->getLogger();
+  auto logger = prof->get_console_logger();
   logger->debug("OnThreadEnd fired");
   IMPLICITLY_USE(jvmti_env);
   IMPLICITLY_USE(jni_env);
@@ -73,7 +73,7 @@ void JNICALL OnClassLoad(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
 // Create a java thread -- currently used
 // to run profiler thread
 jthread create_thread(JNIEnv *jni_env) {
-  auto logger = prof->getLogger();
+  auto logger = prof->get_console_logger();
   logger->debug("Creating a thread in create_thread");
   jclass cls = jni_env->FindClass("java/lang/Thread");
   if( cls == nullptr ) {
@@ -97,7 +97,7 @@ jthread create_thread(JNIEnv *jni_env) {
  * are called.
  */
 static bool updateEventsEnabledState(jvmtiEnv *jvmti, jvmtiEventMode enabledState) {
-  auto logger = prof->getLogger();
+  auto logger = prof->get_console_logger();
   logger->info("Setting CLASS_PREPARE to enabled");
   JVMTI_ERROR_1(
       (jvmti->SetEventNotificationMode(enabledState, JVMTI_EVENT_CLASS_PREPARE, nullptr)),
@@ -142,7 +142,7 @@ void CreateJMethodIDsForClass(jvmtiEnv *jvmti, jclass klass) {
   if (!prof->isRunning()){
     return;
   }
-  auto logger = prof->getLogger();
+  auto logger = prof->get_console_logger();
 //  logger->info("In CreateJMethodIDsForClass start");
   bool releaseLock = acquireCreateLock();
   jint method_count;
@@ -162,7 +162,6 @@ void CreateJMethodIDsForClass(jvmtiEnv *jvmti, jclass klass) {
         fmt::arg("class", ksig.Get()), fmt::arg("scope", prof->getPackage()));
     if (is_unsafe(ksig.Get()))
     {
-        prof->getLogger()->info("checking class {}", ksig.Get());
         for (int i = 0; i < method_count; ++i)
         {
             jmethodID method_id = methods.Get()[i];
@@ -221,7 +220,7 @@ void JNICALL OnVMDeath(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
   //  prof->printInScopeLineNumberMapping();
 
   // prof->clearProgressPoint();
-    prof->getLogger()->info("On VM death. Stopping profiler...");
+    prof->get_console_logger()->info("On VM death. Stopping profiler...");
     Profiler::Stop();
     updateEventsEnabledState(prof->getJVMTI(), JVMTI_DISABLE);
     Profiler::clearProgressPoint();
@@ -272,7 +271,8 @@ static bool PrepareJvmti(jvmtiEnv *jvmti) {
 
 static bool RegisterJvmti(jvmtiEnv *jvmti) {
   // Create the list of callbacks to be called on given events.
-  auto logger = prof->getLogger();
+  auto logger = prof->get_console_logger();
+  logger->set_pattern("[%n-%l] %v");
   logger->info("Registering jvmtiEventCallbacks in RegisterJvmti");
   jvmtiEventCallbacks *callbacks = new jvmtiEventCallbacks();
   memset(callbacks, 0, sizeof(jvmtiEventCallbacks));
@@ -366,7 +366,7 @@ AGENTEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options,
   prof = new Profiler(jvmti);
   prof->ParseOptions(options);
   prof->setJVMTI(jvmti);
-  prof->getLogger()->info("Successfully loaded agent.");
+  prof->get_console_logger()->info("Successfully loaded agent.");
   return 0;
 }
 
@@ -391,7 +391,7 @@ jvmtiError run_profiler(JNIEnv* jni)
         jclass next_loaded_class = loaded_classes[i];
         JvmtiScopedPtr<char> ksig(jvmti);
         jvmti->GetClassSignature(next_loaded_class, ksig.GetRef(), nullptr);
-        prof->getLogger()->debug("Loading class {}", ksig.Get());
+        prof->get_console_logger()->debug("Loading class {}", ksig.Get());
         CreateJMethodIDsForClass(jvmti, next_loaded_class);
     }
 
