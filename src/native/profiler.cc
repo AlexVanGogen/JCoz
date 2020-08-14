@@ -290,6 +290,10 @@ void Profiler::runExperiment(JNIEnv * jni_env) {
   console_logger->flush();
   in_experiment = true;
   points_hit = 0;
+  for (auto user_thread : user_threads)
+  {
+    user_thread->local_delay = 0;
+  }
 
   current_experiment.speedup = calculate_random_speedup();
   current_experiment.delay =
