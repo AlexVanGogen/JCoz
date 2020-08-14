@@ -55,6 +55,8 @@ __thread JNIEnv * Accessors::env_;
 #define NUM_CALL_FRAMES 200
 #define MAX_BCI 65536
 
+#define SAMPLES_BATCH_SIZE 10
+
 typedef std::chrono::duration<int, std::milli> milliseconds_type;
 typedef std::chrono::duration<long, std::nano> nanoseconds_type;
 
@@ -306,8 +308,25 @@ void Profiler::runExperiment(JNIEnv * jni_env) {
 
   jcoz_sleep(SIGNAL_FREQ);
   in_experiment = false;
-  signal_user_threads();
-  jcoz_sleep(SIGNAL_FREQ);
+
+  // Wait until all threads handle their samples
+  while (true)
+  {
+    signal_user_threads();
+    jcoz_sleep(SIGNAL_FREQ);
+    bool has_not_signaled_thread = false;
+    for (auto user_thread : user_threads)
+    {
+      if (user_thread->local_delay > 0)
+      {
+        console_logger->info("Thread {} had not still handled its samples. Local delay: {}",
+                             reinterpret_cast<void*>(&(user_thread->java_thread)), user_thread->local_delay);
+        has_not_signaled_thread = true;
+        break;
+      }
+    }
+    if (!has_not_signaled_thread) break;
+  }
 
   //TODO this is to avoid calling up to a synchronized java method, resulting in a deadlock,
   // this might still be a race condition with Stop()
@@ -354,6 +373,11 @@ void Profiler::runExperiment(JNIEnv * jni_env) {
                fmt::arg("line_no", current_experiment.lineno));
   jcoz_logger->flush();
 
+  if (current_experiment.delay > current_experiment.duration || current_experiment.speedup == 0 && current_experiment.delay > 0)
+  {
+    console_logger->info("Last experiment: something went wrong with delays");
+    console_logger->flush();
+  }
   delete[] current_experiment.location_ranges;
   console_logger->info("Finished experiment, flushed logs, and delete current location ranges.");
 }
@@ -795,7 +819,7 @@ void Profiler::Handle(int signum, siginfo_t *info, void *context) {
       }
     }
 
-    if( curr_ut->num_signals_received == 10 ) {
+    if( curr_ut->num_signals_received == SAMPLES_BATCH_SIZE ) {
       long sleep_diff = global_delay - curr_ut->local_delay;
       if( sleep_diff > 0 ) {
         curr_ut->local_delay += jcoz_sleep(sleep_diff);
