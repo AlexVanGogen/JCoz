@@ -38,6 +38,7 @@
 #include <climits>
 #include <string>
 #include <sstream>
+#include <iterator>
 
 #include "display.h"
 #include "globals.h"
@@ -88,9 +89,10 @@ unsigned long Profiler::warmup_time = 5000000;
 bool Profiler::prof_ready = false;
 
 // Progress point stuff
-std::string Profiler::package;
 struct ProgressPoint* Profiler::progress_point = nullptr;
 std::string Profiler::progress_class;
+std::vector<std::string> Profiler::search_scopes;
+std::vector<std::string> Profiler::ignored_scopes;
 std::map<jmethodID, std::map<jint, bci_hits::hit_freq_t>> bci_hits::_freqs;
 std::map<jmethodID, char*> bci_hits::_declaring_classes;
 std::unordered_set<jmethodID> Profiler::prohibited_methods;
@@ -105,8 +107,6 @@ nanoseconds_type startup_time;
 // Logger
 std::shared_ptr<spdlog::logger> Profiler::console_logger = spdlog::stdout_logger_mt("jcoz");
 std::shared_ptr<spdlog::logger> Profiler::jcoz_logger = spdlog::basic_logger_mt("jcoz-output", "output.coz");
-
-std::vector<std::string> Profiler::scopes_to_ignore;
 
 void Profiler::ParseOptions(const char *options) {
 
@@ -143,10 +143,14 @@ void Profiler::ParseOptions(const char *options) {
           agent_args::report_error(fmt::format("Unknown option: {}", option).c_str());
           break;
 
-        case _package:
+        case _search_scopes:
         {
-          Profiler::package = value;
-          prepare_scope(Profiler::package);
+          std::stringstream search_scopes_stream(value);
+          while (std::getline(search_scopes_stream, item, '|'))
+          {
+            prepare_scope(item);
+            add_search_scope(item);
+          }
           break;
         }
 
@@ -189,27 +193,25 @@ void Profiler::ParseOptions(const char *options) {
     }
 
 
-    std::string joint_scopes;
-    const char* const delim = ", ";
-    for (auto next_scope = Profiler::scopes_to_ignore.begin(); next_scope != Profiler::scopes_to_ignore.end(); ++next_scope)
-    {
-        joint_scopes += *next_scope;
-        if (next_scope != Profiler::scopes_to_ignore.end() - 1)
-        {
-            joint_scopes += delim;
-        }
-    }
+  const char* const delim = ", ";
+
+  std::stringstream joint_search_scopes;
+  std::copy(search_scopes.begin(), search_scopes.end(), std::ostream_iterator<std::string>(joint_search_scopes, delim));
+
+  std::stringstream joint_ignored_scopes;
+  std::copy(ignored_scopes.begin(), ignored_scopes.end(), std::ostream_iterator<std::string>(joint_ignored_scopes, delim));
 
   console_logger->info("Profiler arguments:\n"
                  "\tprogress point: {}:{}\n"
-                 "\tscope: {}\n"
-                 "\tscopes to ignore: {}\n"
+                 "\tsearch scopes: {}\n"
+                 "\tignored scopes: {}\n"
                  "\twarmup: {}us\n"
                  "\tend-to-end: {}\n"
                  "\tfixed experiment duration: {}",
-            progress_class, progress_point->lineno, Profiler::package, joint_scopes, warmup_time, end_to_end, fix_exp);
-    if( Profiler::package.empty() || (!end_to_end && (progress_class.empty() || progress_point->lineno == -1)) ) {
-        agent_args::report_error("Missing package, progress class, or progress point\n");
+                       progress_class, progress_point->lineno, joint_search_scopes.str(), joint_ignored_scopes.str(), warmup_time, end_to_end, fix_exp);
+    if (search_scopes.empty() || (!end_to_end && (progress_class.empty() || progress_point->lineno == -1)))
+    {
+      agent_args::report_error("Missing package, progress class, or progress point\n");
     }
 }
 
@@ -679,8 +681,14 @@ void Profiler::prepare_scope(std::string& scope) {
     std::replace(scope.begin(), scope.end(), '.', '/');
 }
 
-void Profiler::add_ignored_scope(std::string& scope) {
-    scopes_to_ignore.emplace_back(scope);
+void Profiler::add_search_scope(string &scope)
+{
+  search_scopes.emplace_back(scope);
+}
+
+void Profiler::add_ignored_scope(std::string& scope)
+{
+  ignored_scopes.emplace_back(scope);
 }
 
 void Profiler::Handle(int signum, siginfo_t *info, void *context) {

@@ -106,13 +106,12 @@ class Profiler {
 
     void ParseOptions(const char *options);
 
-    static std::string &getPackage() { return package; }
-
     static std::string &getProgressClass() { return progress_class; }
 
     static std::shared_ptr<spdlog::logger> &get_console_logger() { return console_logger; };
 
-    static std::vector<std::string>& getScopesToIgnore() { return scopes_to_ignore; }
+    static std::vector<std::string>& get_search_scopes() { return search_scopes; }
+    static std::vector<std::string>& get_ignored_scopes() { return ignored_scopes; }
 
     static void runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args);
 
@@ -160,6 +159,7 @@ private:
     static bool inline frameInScope(JVMPI_CallFrame &curr_frame);
 
     static void prepare_scope(std::string &scope);
+    static void add_search_scope(std::string &scope);
     static void add_ignored_scope(std::string &scope);
 
     static std::unordered_set<void *> in_scope_ids;
@@ -204,8 +204,6 @@ private:
 
     static void cleanSignature(char *sig);
 
-    static std::string package;
-
     static struct ProgressPoint *progress_point;
 
     static std::string progress_class;
@@ -221,7 +219,8 @@ private:
     static std::shared_ptr<spdlog::logger> console_logger;
     static std::shared_ptr<spdlog::logger> jcoz_logger;
 
-    static std::vector<std::string> scopes_to_ignore;
+    static std::vector<std::string> search_scopes;
+    static std::vector<std::string> ignored_scopes;
 
     static std::unordered_set<jmethodID> prohibited_methods;
 };
