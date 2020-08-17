@@ -96,13 +96,6 @@ struct TraceData {
   JVMPI_CallTrace trace;
 };
 
-struct candidate_trace
-{
-  JVMPI_CallTrace trace;
-  uint16_t selected_frame_idx;
-  bool is_selected;
-};
-
 class Profiler {
   public:
     explicit Profiler(jvmtiEnv *jvmti) : jvmti_(jvmti) {}
@@ -226,8 +219,6 @@ private:
     static bool prof_ready;
 
     static bool fix_exp;
-
-    static bool print_traces;
 
     static std::shared_ptr<spdlog::logger> console_logger;
     static std::shared_ptr<spdlog::logger> jcoz_logger;

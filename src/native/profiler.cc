@@ -98,7 +98,6 @@ static std::atomic<int> call_index(0);
 static JVMPI_CallFrame static_call_frames[NUM_CALL_FRAMES];
 
 bool Profiler::fix_exp = false;
-bool Profiler::print_traces = false;
 
 nanoseconds_type startup_time;
 
@@ -107,12 +106,6 @@ std::shared_ptr<spdlog::logger> Profiler::console_logger = spdlog::stdout_logger
 std::shared_ptr<spdlog::logger> Profiler::jcoz_logger = spdlog::basic_logger_mt("jcoz-output", "output.coz");
 
 std::vector<std::string> Profiler::scopes_to_ignore;
-JVMPI_CallFrame frame_buffer[kMaxStackTraces][kMaxFramesToCapture];
-static candidate_trace traces[kMaxStackTraces];
-static uint16_t trace_idx = 0;
-
-StackTracesPrinter* printer;
-FILE *traces_file;
 
 void Profiler::ParseOptions(const char *options) {
 
@@ -173,8 +166,6 @@ void Profiler::ParseOptions(const char *options) {
                 canonicalize(item);
                 Profiler::addScopeToIgnore(item);
             }
-        } else if (option == "traces") {
-            print_traces = true;
         }
     }
 
@@ -190,15 +181,14 @@ void Profiler::ParseOptions(const char *options) {
         }
     }
 
-    console_logger->info("Profiler arguments:\n"
-                         "\tprogress point: {}:{}\n"
-                         "\tscope: {}\n"
-                         "\tscopes to ignore: {}\n"
-                         "\twarmup: {}us\n"
-                         "\tend-to-end: {}\n"
-                         "\tfixed experiment duration: {}\n"
-                         "\tprint stacktraces: {}",
-            progress_class, progress_point->lineno, Profiler::package, joint_scopes, warmup_time, end_to_end, fix_exp, print_traces);
+  console_logger->info("Profiler arguments:\n"
+                 "\tprogress point: {}:{}\n"
+                 "\tscope: {}\n"
+                 "\tscopes to ignore: {}\n"
+                 "\twarmup: {}us\n"
+                 "\tend-to-end: {}\n"
+                 "\tfixed experiment duration: {}",
+            progress_class, progress_point->lineno, Profiler::package, joint_scopes, warmup_time, end_to_end, fix_exp);
     if( Profiler::package.empty() || (!end_to_end && (progress_class.empty() || progress_point->lineno == -1)) ) {
         fprintf(stderr, "Missing package, progress class, or progress point\n");
         print_usage();
@@ -401,13 +391,6 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
   global_delay = 0;
   startup_time = std::chrono::high_resolution_clock::now().time_since_epoch();
   agent_pthread = pthread_self();
-
-  if (print_traces)
-  {
-    traces_file = fopen("traces.txt", "w");
-    printer = new StackTracesPrinter(traces_file, jvmti_env);
-  }
-
   while (!__sync_bool_compare_and_swap(&user_threads_lock, 0, 1))
     ;
   std::atomic_thread_fence(std::memory_order_acquire);
@@ -421,14 +404,6 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
   while (_running) {
     console_logger->info("Starting next profiling loop. Collecting call frames for experiment...");
     console_logger->flush();
-
-    if (print_traces)
-    {
-      while (!__sync_bool_compare_and_swap(&frame_lock, 0, 1));
-      std::atomic_thread_fence(std::memory_order_acquire);
-      frame_lock = 0;
-      std::atomic_thread_fence(std::memory_order_release);
-    }
 
     // 15 * SIGNAL_FREQ with randomization should give us roughly
     // the same number of iterations as doing 10 * SIGNAL_FREQ without
@@ -470,7 +445,6 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
         exp_frame = call_frames.at(j);
         jvmtiError lineNumberError = jvmti->GetLineNumberTable(exp_frame.method_id, &num_entries, &entries);
         if( lineNumberError == JVMTI_ERROR_NONE ) {
-          traces[j].is_selected = true;
           break;
         } else {
           jvmti->Deallocate((unsigned char *)entries);
@@ -481,20 +455,9 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
       if( entries == nullptr ) {
         // TODO(dcv): Should we clear the call frames here?
         console_logger->debug("No in scope frames found. Trying again.");
-        trace_idx = 0;
 //        frame_lock = 0;
 //        std::atomic_thread_fence(std::memory_order_release);
         continue;
-      }
-
-      if (print_traces)
-      {
-        fprintf(traces_file, "===================== Started next experiment. Select traces... =====================\n");
-        for (uint16_t i = 0; i < trace_idx; ++i)
-        {
-          printer->PrintStackTrace(traces[i]);
-        }
-        trace_idx = 0;
       }
 
       console_logger->debug("Found in scope frames. Choosing a frame and running experiment...");
@@ -551,22 +514,15 @@ Profiler::runAgentThread(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *args) {
       std::atomic_thread_fence(std::memory_order_acquire);
       call_frames.clear();
       memset(static_call_frames, 0, NUM_CALL_FRAMES * sizeof(JVMPI_CallFrame));
-      trace_idx = 0;
       frame_lock = 0;                                                 // Release frame_lock
       std::atomic_thread_fence(std::memory_order_release);
       jvmti->Deallocate((unsigned char *)entries);
       console_logger->info("Finished clearing frames and deallocating entries...");
     } else {
-      console_logger->info("No frames found in agent thread. Trying sampling loop again...");
+      console_logger->debug("No frames found in agent thread. Trying sampling loop again...");
 //      frame_lock = 0;
 //      std::atomic_thread_fence(std::memory_order_release);
     }
-  }
-
-  if (print_traces)
-  {
-    delete printer;
-    fclose(traces_file);
   }
 
   console_logger->info("Profiler done running...");
@@ -783,25 +739,6 @@ void Profiler::Handle(int signum, siginfo_t *info, void *context) {
         int index = call_index.fetch_add(1);
         if (index < NUM_CALL_FRAMES) {
           static_call_frames[index] = curr_frame;
-        }
-        if (print_traces)
-        {
-          JVMPI_CallFrame *fb = frame_buffer[trace_idx];
-          for (int frame_num = 0; frame_num < trace.num_frames; ++frame_num)
-          {
-            base = reinterpret_cast<char *>(&(fb[frame_num]));
-            // Make sure the padding is all set to 0.
-            for (char *p = base; p < base + sizeof(JVMPI_CallFrame); p++) {
-              *p = 0;
-            }
-            fb[frame_num].lineno = trace.frames[frame_num].lineno;
-            fb[frame_num].method_id = trace.frames[frame_num].method_id;
-          }
-          traces[trace_idx].trace.frames = fb;
-          traces[trace_idx].trace.num_frames = trace.num_frames;
-          traces[trace_idx].selected_frame_idx = i;
-          traces[trace_idx].is_selected = false;
-          trace_idx = (trace_idx + 1) % kMaxStackTraces;
         }
         frame_lock = 0;
         std::atomic_thread_fence(std::memory_order_release);
