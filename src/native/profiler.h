@@ -159,8 +159,8 @@ private:
     static bool inline inExperiment(JVMPI_CallFrame &curr_frame);
     static bool inline frameInScope(JVMPI_CallFrame &curr_frame);
 
-    static void canonicalize(std::string &scope);
-    static void addScopeToIgnore(std::string&);
+    static void prepare_scope(std::string &scope);
+    static void add_ignored_scope(std::string &scope);
 
     static std::unordered_set<void *> in_scope_ids;
 
@@ -205,8 +205,6 @@ private:
     static void cleanSignature(char *sig);
 
     static std::string package;
-
-    static void print_usage();
 
     static struct ProgressPoint *progress_point;
 

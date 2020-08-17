@@ -41,6 +41,7 @@
 
 #include "display.h"
 #include "globals.h"
+#include "args.h"
 
 #ifdef __APPLE__
 // See comment in Accessors class
@@ -109,12 +110,13 @@ std::vector<std::string> Profiler::scopes_to_ignore;
 
 void Profiler::ParseOptions(const char *options) {
 
-    if( options == nullptr ) {
-        fprintf(stderr, "Missing options\n");
-        print_usage();
-        exit(1);
-    }else{
-        console_logger->info("Received options: {}", options);
+    if (options == nullptr)
+    {
+        agent_args::report_error("Missing options\n");
+    }
+    else
+    {
+      console_logger->info("Received options: {}", options);
     }
     std::string options_str(options);
     std::stringstream ss(options_str);
@@ -135,38 +137,55 @@ void Profiler::ParseOptions(const char *options) {
         std::string option = cmd_line_option.substr(0, equal_index);
         std::string value = cmd_line_option.substr(equal_index + 1);
 
-        // extract package
-        if( option == "pkg" || option == "package" ) {
-            Profiler::package = value;
-            canonicalize(Profiler::package);
-        } else if (option == "progress-point") {
+      switch (agent_args::from_string(option))
+      {
+        case _unknown:
+          agent_args::report_error(fmt::format("Unknown option: {}", option).c_str());
+          break;
 
-            // else extract progress point
-            size_t colon_index = value.find(':');
-            if( colon_index == std::string::npos ) {
-                fprintf(stderr, "Missing progress point\n");
-                print_usage();
-                exit(1);
-            }
-
-            Profiler::progress_class = value.substr(0, colon_index);
-            canonicalize(Profiler::progress_class);
-            progress_point->lineno = std::stoi(value.substr(colon_index + 1));
-
-        } else if (option == "end-to-end") {
-            end_to_end = true;
-        } else if (option == "warmup") {
-            // We expect # of milliseconds so multiply by 1000 for usleep (takes microseconds)
-            warmup_time = std::stol(value) * 1000;
-        } else if (option == "fix-exp" ) {
-            fix_exp = true;
-        } else if (option == "ignore") {
-            std::stringstream ignore_scopes_stream(value);
-            while( std::getline(ignore_scopes_stream, item, '|') ) {
-                canonicalize(item);
-                Profiler::addScopeToIgnore(item);
-            }
+        case _package:
+        {
+          Profiler::package = value;
+          prepare_scope(Profiler::package);
+          break;
         }
+
+        case _ignored_scopes:
+        {
+          std::stringstream ignore_scopes_stream(value);
+          while (std::getline(ignore_scopes_stream, item, '|'))
+          {
+            prepare_scope(item);
+            add_ignored_scope(item);
+          }
+          break;
+        }
+
+        case _progress_point:
+        {
+          size_t colon_index = value.find(':');
+          if (colon_index == std::string::npos)
+            agent_args::report_error("Missing progress point");
+
+          progress_class = value.substr(0, colon_index);
+          prepare_scope(progress_class);
+          progress_point->lineno = std::stoi(value.substr(colon_index + 1));
+          break;
+        }
+
+        case _end_to_end:
+          end_to_end = true;
+          break;
+
+        case _warmup:
+          // We expect # of milliseconds so multiply by 1000 for usleep (takes microseconds)
+          warmup_time = std::stol(value) * 1000;
+          break;
+
+        case _fix_exp:
+          fix_exp = true;
+          break;
+      }
     }
 
 
@@ -190,9 +209,7 @@ void Profiler::ParseOptions(const char *options) {
                  "\tfixed experiment duration: {}",
             progress_class, progress_point->lineno, Profiler::package, joint_scopes, warmup_time, end_to_end, fix_exp);
     if( Profiler::package.empty() || (!end_to_end && (progress_class.empty() || progress_point->lineno == -1)) ) {
-        fprintf(stderr, "Missing package, progress class, or progress point\n");
-        print_usage();
-        exit(1);
+        agent_args::report_error("Missing package, progress class, or progress point\n");
     }
 }
 
@@ -242,17 +259,6 @@ void Profiler::signal_user_threads() {
   }
   user_threads_lock = 0;
   std::atomic_thread_fence(std::memory_order_release);
-}
-
-void Profiler::print_usage() {
-  std::cout
-    << "usage: java -agentpath:<absolute_path_to_agent>="
-    << "pkg=<package_name>_"
-    << "progress-point=<class:line_no>_"
-    << "end-to-end (optional)_"
-    << "warmup=<warmup_time_ms> (optional - default 5000 ms)"
-    << "slow-exp (optional - perform exponential slowdown of experiment time with low delta)"
-    << std::endl;
 }
 
 /**
@@ -669,11 +675,11 @@ void Profiler::addProgressPoint(jint method_count, jmethodID *methods) {
   console_logger->error("Unable to set progress point");
 }
 
-void Profiler::canonicalize(std::string& scope) {
+void Profiler::prepare_scope(std::string& scope) {
     std::replace(scope.begin(), scope.end(), '.', '/');
 }
 
-void Profiler::addScopeToIgnore(std::string& scope) {
+void Profiler::add_ignored_scope(std::string& scope) {
     scopes_to_ignore.emplace_back(scope);
 }
 
