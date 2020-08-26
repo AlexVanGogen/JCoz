@@ -18,3 +18,10 @@ tasks.jar {
         attributes("Premain-Class" to "edu.avgogen.jcoz.tools.ppfinder.ProgressPointFinderAgent")
     }
 }
+
+task<JavaExec>("testFinder") {
+    dependsOn += tasks["build"]
+    classpath = sourceSets["test"].runtimeClasspath
+    main = "edu.avgogen.jcoz.tools.ppfinder.ProgressPointFinderTestKt"
+    jvmArgs = listOf("-javaagent:${tasks.jar.get().archiveFile.get()}")
+}
