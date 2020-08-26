@@ -12,3 +12,9 @@ repositories {
 dependencies {
     implementation(kotlin("stdlib"))
 }
+
+tasks.jar {
+    manifest {
+        attributes("Premain-Class" to "edu.avgogen.jcoz.tools.ppfinder.ProgressPointFinderAgent")
+    }
+}
