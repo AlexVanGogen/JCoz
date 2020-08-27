@@ -11,6 +11,7 @@ repositories {
 
 dependencies {
     implementation(kotlin("stdlib"))
+    implementation("org.ow2.asm:asm:7.1")
 }
 
 tasks.jar {
