@@ -7,7 +7,7 @@ class ProgressPointFinderAgent {
     companion object {
         @JvmStatic
         fun premain(agentArgs: String?, instrumentation: Instrumentation) {
-            instrumentation.addTransformer(SourceLineHitsDetector())
+            instrumentation.addTransformer(SourceLineHitsDetector("output.txt"))
         }
     }
 }
