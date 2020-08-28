@@ -15,7 +15,7 @@ class SourceLineHitsDetector(private val outputFileName: String) : ClassFileTran
         protectionDomain: ProtectionDomain?,
         classfileBuffer: ByteArray
     ): ByteArray? {
-        if (loader == null || classBeingRedefined != null) {
+        if (loader == null || classBeingRedefined != null || className == null) {
             return null
         }
         val reader = ClassReader(classfileBuffer)
@@ -26,7 +26,7 @@ class SourceLineHitsDetector(private val outputFileName: String) : ClassFileTran
 
     class ClassSourceLineHitsRecordingVisitor(
         private val classVisitor: ClassVisitor,
-        private val className: String?,
+        private val className: String,
         private val opcode: Int,
         private val outputFileName: String
     ) : ClassVisitor(opcode, classVisitor) {
@@ -49,7 +49,7 @@ class SourceLineHitsDetector(private val outputFileName: String) : ClassFileTran
 
     class PerMethodSourceLineHitsRecordingVisitor(
         private val methodVisitor: MethodVisitor,
-        private val className: String?,
+        private val className: String,
         opcode: Int,
         private val outputFileName: String
     ) : MethodVisitor(opcode, methodVisitor) {
