@@ -13,8 +13,11 @@ class SourceLineHitsDetector(private val outputFileName: String) : ClassFileTran
         className: String?,
         classBeingRedefined: Class<*>?,
         protectionDomain: ProtectionDomain?,
-        classfileBuffer: ByteArray?
-    ): ByteArray {
+        classfileBuffer: ByteArray
+    ): ByteArray? {
+        if (loader == null || classBeingRedefined != null) {
+            return null
+        }
         val reader = ClassReader(classfileBuffer)
         val writer = ClassWriter(reader, COMPUTE_MAXS)
         reader.accept(ClassSourceLineHitsRecordingVisitor(writer, className, ASM7, outputFileName), 0)
