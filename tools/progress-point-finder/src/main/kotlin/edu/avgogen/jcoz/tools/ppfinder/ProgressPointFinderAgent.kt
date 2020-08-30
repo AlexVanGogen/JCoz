@@ -7,7 +7,13 @@ class ProgressPointFinderAgent {
     companion object {
         @JvmStatic
         fun premain(agentArgs: String?, instrumentation: Instrumentation) {
-            instrumentation.addTransformer(SourceLineHitsDetector("output.txt"))
+            val b = with(HitsRecorder().javaClass) {
+                classLoader.getResourceAsStream(name.replace('.', '/') + ".class")
+            }.use {
+                it?.readAllBytes()
+            } ?: throw AssertionError()
+            CustomClassLoader().defineClass("edu.avgogen.jcoz.tools.ppfinder.HitsRecorder", b)
+            instrumentation.addTransformer(SourceLineHitsDetector())
         }
     }
 }

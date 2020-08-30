@@ -1,8 +1,24 @@
 package edu.avgogen.jcoz.tools.ppfinder
 
-fun foo() {
-    println(Obj.bar(42))
-    println(81)
+import java.io.File
+
+class A(val x: Int) {
+
+}
+
+interface Fooable {
+    fun foo(x: String)
+}
+
+fun foo(a: A) {
+//    if (a.x > 5) {
+//        object : Fooable {
+//            override fun foo(x: String) {
+//                println(x)
+//            }
+//        }.foo(a.x.toString())
+//    }
+    println(a.x)
 }
 
 object Obj {
@@ -12,5 +28,11 @@ object Obj {
 }
 
 fun main() {
-    foo()
+
+    try {
+        foo(A(42))
+    } catch (e: Throwable) {
+        e.printStackTrace()
+        throw e
+    }
 }

@@ -6,7 +6,7 @@ import org.objectweb.asm.Opcodes.*
 import java.lang.instrument.ClassFileTransformer
 import java.security.ProtectionDomain
 
-class SourceLineHitsDetector(private val outputFileName: String) : ClassFileTransformer {
+class SourceLineHitsDetector : ClassFileTransformer {
 
     override fun transform(
         loader: ClassLoader?,
@@ -15,20 +15,19 @@ class SourceLineHitsDetector(private val outputFileName: String) : ClassFileTran
         protectionDomain: ProtectionDomain?,
         classfileBuffer: ByteArray
     ): ByteArray? {
-        if (loader == null || classBeingRedefined != null || className == null) {
+        if (loader == null || classBeingRedefined != null || className == null || className.startsWith("edu/avgogen/jcoz/tools/ppfinder/HitsRecorder")) {
             return null
         }
         val reader = ClassReader(classfileBuffer)
-        val writer = ClassWriter(reader, COMPUTE_MAXS)
-        reader.accept(ClassSourceLineHitsRecordingVisitor(writer, className, ASM7, outputFileName), 0)
+        val writer = ClassWriter(COMPUTE_MAXS)
+        reader.accept(ClassSourceLineHitsRecordingVisitor(writer, className, ASM7), 0)
         return writer.toByteArray()
     }
 
     class ClassSourceLineHitsRecordingVisitor(
-        private val classVisitor: ClassVisitor,
+        classVisitor: ClassVisitor,
         private val className: String,
-        private val opcode: Int,
-        private val outputFileName: String
+        private val opcode: Int
     ) : ClassVisitor(opcode, classVisitor) {
 
         override fun visitMethod(
@@ -39,59 +38,29 @@ class SourceLineHitsDetector(private val outputFileName: String) : ClassFileTran
             exceptions: Array<out String>?
         ): MethodVisitor? {
             return PerMethodSourceLineHitsRecordingVisitor(
-                classVisitor.visitMethod(access, name, desc, signature, exceptions),
-                className,
-                opcode,
-                outputFileName
+                    cv.visitMethod(access, name, desc, signature, exceptions),
+                    className,
+                    opcode
             )
         }
     }
 
     class PerMethodSourceLineHitsRecordingVisitor(
-        private val methodVisitor: MethodVisitor,
+        methodVisitor: MethodVisitor,
         private val className: String,
-        opcode: Int,
-        private val outputFileName: String
+        opcode: Int
     ) : MethodVisitor(opcode, methodVisitor) {
 
         private var lastLine = -1
 
         override fun visitLineNumber(line: Int, start: Label?) {
             if (line != lastLine) {
-                interceptDumpLine(outputFileName, line)
-                interceptTimestamp(outputFileName)
+                mv.visitLdcInsn(className)
+                mv.visitLdcInsn(line)
+                mv.visitMethodInsn(INVOKESTATIC, "edu/avgogen/jcoz/tools/ppfinder/HitsRecorder", "registerHit", "(Ljava/lang/String;I)V", false)
                 lastLine = line
             }
-            methodVisitor.visitLineNumber(line, start)
-        }
-
-        private fun interceptDumpLine(fileName: String, lineNumber: Int) {
-            initFileAndWriteText(fileName) {
-                visitLdcInsn("\n$className:$lineNumber: ")
-            }
-        }
-
-        private fun interceptTimestamp(fileName: String) {
-            initFileAndWriteText(fileName) {
-                visitMethodInsn(INVOKESTATIC, "java/lang/System", "nanoTime", "()J", false)
-                visitMethodInsn(INVOKESTATIC, "java/lang/String", "valueOf", "(J)Ljava/lang/String;", false)
-            }
-        }
-
-        private inline fun initFileAndWriteText(fileName: String, buildTextBytecode: MethodVisitor.() -> Unit) {
-            // File(fileName)
-            visitTypeInsn(NEW, "java/io/File")
-            visitInsn(DUP)
-            visitLdcInsn(fileName)
-            visitMethodInsn(INVOKESPECIAL, "java/io/File", "<init>", "(Ljava/lang/String;)V", false)
-
-            // .appendText(text)
-            this.buildTextBytecode()
-
-            visitInsn(ACONST_NULL)
-            visitInsn(ICONST_2)
-            visitInsn(ACONST_NULL)
-            visitMethodInsn(INVOKESTATIC, "kotlin/io/FilesKt", "appendText\$default", "(Ljava/io/File;Ljava/lang/String;Ljava/nio/charset/Charset;ILjava/lang/Object;)V", false)
+            mv.visitLineNumber(line, start)
         }
     }
 }
