@@ -1,28 +1,30 @@
 package edu.avgogen.jcoz.tools.ppfinder;
 
 import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class HitsRecorder {
-    private static final ConcurrentHashMap<String, HashMap<Integer, SourceLineHitsStatistics>> hits = new ConcurrentHashMap<>();
+    private static final Map<Thread, Map<String, Map<Integer, SourceLineHitsStatistics>>> hits = new HashMap<>();
     private static final AtomicLong timer = new AtomicLong(0);
 
     static {
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> hits.forEach((className, lineHits) -> {
-            System.out.println("Class " + className);
-            lineHits.forEach((lineNumber, hits) -> System.out.println("\tline " + lineNumber + ": " + hits.toString()));
-        })));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> hits.forEach(((thread, threadHits) -> {
+            System.out.println("Thread " + thread.getName());
+            threadHits.forEach((className, lineHits) -> {
+                System.out.println("\tClass " + className);
+                lineHits.forEach((lineNumber, hits) -> System.out.println("\t\tline " + lineNumber + ": " + hits.toString()));
+            });
+        }))));
     }
 
     public static void registerHit(String className, int lineNumber) {
         long time = timer.incrementAndGet();
-        hits.putIfAbsent(className, new HashMap<>());
-        HashMap<Integer, SourceLineHitsStatistics> classStatistics = hits.get(className);
-        synchronized (hits) {
-            classStatistics.putIfAbsent(lineNumber, new SourceLineHitsStatistics());
-            classStatistics.get(lineNumber).registerHit(time);
-        }
+        hits.putIfAbsent(Thread.currentThread(), new HashMap<>());
+        hits.get(Thread.currentThread()).putIfAbsent(className, new HashMap<>());
+        Map<Integer, SourceLineHitsStatistics> classStatistics = hits.get(Thread.currentThread()).get(className);
+        classStatistics.putIfAbsent(lineNumber, new SourceLineHitsStatistics());
+        classStatistics.get(lineNumber).registerHit(time);
     }
 
     private static class SourceLineHitsStatistics {
